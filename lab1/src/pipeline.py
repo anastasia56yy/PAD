@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 
 from .generation.llm import OllamaLLM
-from .generation.prompts import REFUSALS, build_messages
+from .generation.prompts import LANGUAGE_NAMES, REFUSALS, TRANSLATE, build_messages
 from .reranking.reranker import Reranker
 from .retrieval.filters import apply_filters
 from .retrieval.retriever import Retriever
@@ -21,9 +21,41 @@ def detect_question_lang(question: str) -> str:
     return "ro" if RO_HINTS.search(question) else "en"
 
 
+RO_WORDS = {"și", "si", "este", "sunt", "pentru", "care", "de", "la", "în", "cu", "din", "o", "un", "nu", "se"}
+EN_WORDS = {"the", "is", "are", "and", "of", "to", "in", "for", "with", "a", "an", "be", "must", "not"}
+
+
+def detect_text_lang(text: str) -> str:
+    """Language of a longer text (an answer), by word statistics: quoted Romanian titles inside an
+    English answer must not flip the result, which a single hint word would."""
+    letters = re.findall(r"[^\W\d_]", text)
+    if letters and sum(1 for c in letters if "а" <= c.lower() <= "я" or c.lower() == "ё") / len(letters) > 0.3:
+        return "ru"
+    words = re.findall(r"\w+", text.lower())
+    ro = sum(w in RO_WORDS for w in words) + 2 * len(re.findall(r"[ăâîșț]", text.lower()))
+    en = sum(w in EN_WORDS for w in words)
+    return "ro" if ro > en else "en"
+
+
 def is_refusal(answer: str) -> bool:
     low = answer.lower()
     return any(r.lower().rstrip(".") in low for r in REFUSALS.values())
+
+
+def sanitize_citations(answer: str, n_sources: int) -> tuple[str, int]:
+    """Drop citations that point outside [1..n_sources] (the model copying article numbers like "[85]").
+    Returns the cleaned answer and how many citations were removed."""
+    removed = 0
+
+    def check(match: re.Match) -> str:
+        nonlocal removed
+        if 1 <= int(match.group(1)) <= n_sources:
+            return match.group(0)
+        removed += 1
+        return ""
+
+    cleaned = re.sub(r"\s?\[(\d+)\]", check, answer)
+    return cleaned, removed
 
 
 @dataclass
@@ -91,8 +123,18 @@ class RAGPipeline:
             trace.update(to_llm=0, generation_s=0.0, total_s=time.perf_counter() - start)
             return RAGResult(question, answer, True, [], retrieved, trace)
 
-        messages, used = build_messages(self.cfg["generation"]["prompt"], question, hits,
-                                        self.cfg["generation"]["max_context_chars"])
+        lang = detect_question_lang(question)
+        prompt = self.cfg["generation"]["prompt"]
+        messages, used = build_messages(prompt, question, hits, self.cfg["generation"]["max_context_chars"], lang)
         answer, gen_s = self.llm.chat(messages)
-        trace.update(to_llm=len(used), generation_s=gen_s, total_s=time.perf_counter() - start)
+        translated = False
+        if prompt == "strict_v2" and not is_refusal(answer) and detect_text_lang(answer) != lang:
+            # 3B models drift into the language of the (mostly Romanian) context; one extra short call fixes it
+            answer, extra_s = self.llm.chat([{"role": "user", "content": TRANSLATE.format(
+                language=LANGUAGE_NAMES[lang], answer=answer)}])
+            gen_s += extra_s
+            translated = True
+        answer, bad_citations = sanitize_citations(answer, len(used))
+        trace.update(to_llm=len(used), generation_s=gen_s, total_s=time.perf_counter() - start,
+                     invalid_citations=bad_citations, translated=translated)
         return RAGResult(question, answer, is_refusal(answer), used, retrieved, trace)

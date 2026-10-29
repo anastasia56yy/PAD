@@ -26,7 +26,35 @@ Rules:
    - ru: "{REFUSALS['ru']}"
    Do not guess and do not add anything else in that case."""
 
-PROMPTS = {"basic": BASIC, "strict": STRICT}
+# v2 fixes the failures found when analysing the strict prompt's answers:
+# - 3B models drift into the language of the context, so the answer language is stated
+#   explicitly at the end of the user message (see build_messages), not only in the rules;
+# - they copied article numbers ("[85]") as citations, so the valid range is spelled out;
+# - the site contradicts itself (two phone numbers for the dean), so conflicts must be reported;
+# - qwen appended the refusal sentence after a correct answer.
+STRICT_V2 = """You are an assistant for students of the Technical University of Moldova (UTM) and its
+Faculty of Computers, Informatics and Microelectronics (FCIM).
+
+Rules:
+1. Use ONLY the numbered context fragments. Do not use your own knowledge about UTM.
+2. Answer in 1-4 complete sentences that restate what the number or name refers to;
+   keep numbers, dates, names and steps exactly as in the context.
+3. After each fact put the number of the fragment it comes from, e.g. [2]. Citation numbers are ONLY
+   the fragment numbers given in the context; never use article, paragraph or page numbers as citations.
+4. If two fragments give different values for the same fact (e.g. two phone numbers), give both values,
+   each with its own citation, and say that the sources differ.
+5. Only if the context does not contain the answer, reply with exactly this sentence and nothing else:
+   "{refusal}"
+   If you can answer, never add this sentence."""
+
+TRANSLATE = """Translate the following answer into {language}. Keep every number, name, e-mail address and
+citation such as [1] exactly as it is. Output only the translation.
+
+{answer}"""
+
+PROMPTS = {"basic": BASIC, "strict": STRICT, "strict_v2": STRICT_V2}
+
+LANGUAGE_NAMES = {"ro": "Romanian", "en": "English", "ru": "Russian"}
 
 
 def format_context(hits) -> str:
@@ -38,7 +66,8 @@ def format_context(hits) -> str:
     return "\n\n".join(parts)
 
 
-def build_messages(prompt_name: str, question: str, hits, max_context_chars: int) -> tuple[list[dict], list]:
+def build_messages(prompt_name: str, question: str, hits, max_context_chars: int,
+                   answer_lang: str = "en") -> tuple[list[dict], list]:
     """Chat messages plus the hits that actually fit into the context budget."""
     context, used = [], 0
     for h in hits:  # hits are already sorted by relevance: cut from the tail
@@ -47,4 +76,10 @@ def build_messages(prompt_name: str, question: str, hits, max_context_chars: int
         context.append(h)
         used += len(h.text)
     user = f"Context:\n{format_context(context)}\n\nQuestion: {question}"
-    return [{"role": "system", "content": PROMPTS[prompt_name]}, {"role": "user", "content": user}], context
+    system = PROMPTS[prompt_name]
+    if prompt_name == "strict_v2":
+        system = system.format(refusal=REFUSALS[answer_lang])
+        # the last line before generation is what a small model follows most reliably, so it carries
+        # the answer language (putting the refusal sentence there made the model refuse too often)
+        user += f"\n\nCite only fragments [1]-[{len(context)}]. Answer in {LANGUAGE_NAMES[answer_lang]}."
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}], context

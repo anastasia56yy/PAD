@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from ..config import resolve
 from ..generation.prompts import format_context
-from ..pipeline import RAGPipeline, is_refusal
+from ..pipeline import RAGPipeline, detect_text_lang, is_refusal
 from .metrics import (has_citation, hit_at_k, keyword_recall, precision_at_k, ranked_docs, recall_at_k,
                       reciprocal_rank)
 
@@ -62,6 +62,8 @@ def evaluate_question(pipe: RAGPipeline, q: dict, k_values: list[int], with_gene
         row["refused"] = float(result.refused or is_refusal(result.answer))
         row["refusal_correct"] = float(row["refused"] == (0.0 if answerable else 1.0))
         row["latency_s"] = round(trace.get("total_s", 0.0), 2)
+        row["lang_match"] = float(detect_text_lang(result.answer) == q.get("lang"))
+        row["invalid_citations"] = float(trace.get("invalid_citations", 0) > 0)
         if answerable:
             row["keyword_recall"] = keyword_recall(result.answer, q.get("keywords", []))
             row["citation"] = float(has_citation(result.answer))
@@ -86,6 +88,8 @@ def summarize(rows: list[dict], k_values: list[int]) -> dict:
         summary["false_refusal_rate"] = _avg(answerable, "refused")
         summary["correct_refusal_rate"] = _avg(unanswerable, "refused")
         summary["avg_latency_s"] = _avg(rows, "latency_s")
+        summary["lang_match"] = _avg(rows, "lang_match")
+        summary["invalid_citation_rate"] = _avg(rows, "invalid_citations")
     summary["avg_retrieval_s"] = round(mean(r["trace"].get("retrieval_s", 0) for r in rows), 3)
     summary["avg_rerank_s"] = round(mean(r["trace"].get("rerank_s", 0) for r in rows), 3)
 

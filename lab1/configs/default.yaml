@@ -75,7 +75,7 @@ generation:
   model: qwen2.5:3b
   temperature: 0.1
   num_ctx: 4096
-  prompt: strict          # strict | basic  (see src/generation/prompts.py)
+  prompt: strict_v2       # basic | strict | strict_v2  (see src/generation/prompts.py)
   max_context_chars: 6000
 
 evaluation:

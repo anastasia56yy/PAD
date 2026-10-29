@@ -90,9 +90,10 @@ llm:
     llama3.2-3b: {generation.model: "llama3.2:3b"}
 
 prompt:
-  description: Базовый prompt vs строгий (только контекст, цитаты, фраза-отказ)
+  description: Базовый prompt vs строгий (только контекст, цитаты, фраза-отказ) vs строгий v2 (язык ответа и диапазон цитат в конце сообщения, правило противоречий)
   generation: true
   base: {}
   variants:
     basic: {generation.prompt: basic}
     strict: {generation.prompt: strict}
+    strict_v2: {generation.prompt: strict_v2}

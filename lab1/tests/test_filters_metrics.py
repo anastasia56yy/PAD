@@ -1,7 +1,7 @@
 from src.evaluation.metrics import (hit_at_k, keyword_present, keyword_recall, precision_at_k, ranked_docs,
                                     recall_at_k, reciprocal_rank)
-from src.pipeline import detect_question_lang, is_refusal
-from src.generation.prompts import REFUSALS
+from src.pipeline import detect_question_lang, detect_text_lang, is_refusal, sanitize_citations
+from src.generation.prompts import REFUSALS, build_messages
 from src.retrieval.filters import apply_filters, deduplicate, jaccard, max_per_document
 from src.retrieval.vector_store import Hit
 
@@ -64,3 +64,25 @@ def test_question_language_and_refusal_detection():
     assert detect_question_lang("When does the session start?") == "en"
     assert is_refusal(REFUSALS["en"])
     assert not is_refusal("The session starts on 5 January [1].")
+
+
+def test_sanitize_citations_drops_out_of_range_numbers():
+    text, removed = sanitize_citations("Un credit = 30 de ore [85]. Anul are 60 de credite [1].", 3)
+    assert text == "Un credit = 30 de ore. Anul are 60 de credite [1]."
+    assert removed == 1
+
+
+def test_detect_text_lang_is_not_fooled_by_quoted_titles():
+    assert detect_text_lang("The student must submit the application listed in the Regulament de evaluare [1].") == "en"
+    assert detect_text_lang("Studentul trebuie să depună cererea și scrisoarea de motivație [1].") == "ro"
+    assert detect_text_lang("Декан FCIM — Dumitru Ciorbă, телефон указан на странице [1].") == "ru"
+
+
+def test_strict_v2_states_answer_language_and_citation_range():
+    hits = [hit("1", 0.9), hit("2", 0.8)]
+    messages, used = build_messages("strict_v2", "What is ECTS?", hits, 10_000, "en")
+    user = messages[1]["content"]
+    assert user.endswith("Answer in English.")
+    assert "[1]-[2]" in user
+    assert REFUSALS["en"] in messages[0]["content"] and REFUSALS["ro"] not in messages[0]["content"]
+    assert len(used) == 2
