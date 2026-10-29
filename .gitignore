@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Grabbed data and indexes are reproducible with `grab` + `index`
+lab1/data/raw/
+lab1/data/processed/
+lab1/data/index/
+lab1/data/manifest.sqlite
+# per-question dumps are large; summaries, CSV and REPORT.md are committed
+lab1/experiments/results/**/per_question.jsonl
