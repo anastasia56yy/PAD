@@ -11,7 +11,7 @@ lab1/data/manifest.sqlite
 # per-question dumps are large; summaries, CSV and REPORT.md are committed
 lab1/experiments/results/**/per_question.jsonl
 # ...except the final configuration: shows the actual generated answers
-!lab1/experiments/results/prompt/strict/per_question.jsonl
+!lab1/experiments/results/prompt/strict_v2/per_question.jsonl
 lab1/experiments/results/cli/
 lab1/experiments/*.log
 .venv-gpu/

@@ -21,21 +21,23 @@
   "ctx_hit": 0.9032,
   "ctx_mrr": 0.7715,
   "ctx_precision": 0.4978,
-  "keyword_recall": 0.7366,
+  "keyword_recall": 0.7527,
   "citation": 0.0,
   "unanswerable_ctx_empty": 0.8571,
   "refusal_accuracy": 0.9474,
   "false_refusal_rate": 0.0323,
   "correct_refusal_rate": 0.8571,
-  "avg_latency_s": 6.5434,
-  "avg_retrieval_s": 0.885,
-  "avg_rerank_s": 0.772,
+  "avg_latency_s": 3.9305,
+  "lang_match": 0.9474,
+  "invalid_citation_rate": 0.0,
+  "avg_retrieval_s": 0.05,
+  "avg_rerank_s": 0.126,
   "by_type": {
     "factoid": {
       "hit@5": 0.9231,
       "mrr": 0.6987,
       "ctx_hit": 0.9231,
-      "keyword_recall": 0.8462,
+      "keyword_recall": 0.8846,
       "refusal_correct": 1.0
     },
     "specific": {
