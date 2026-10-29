@@ -1,0 +1,50 @@
+{
+  "n_questions": 38,
+  "n_answerable": 31,
+  "n_unanswerable": 7,
+  "hit@1": 0.4839,
+  "hit@3": 0.6774,
+  "hit@5": 0.7742,
+  "hit@10": 0.8387,
+  "hit@20": 0.871,
+  "recall@1": 0.3065,
+  "recall@3": 0.4946,
+  "recall@5": 0.5914,
+  "recall@10": 0.6344,
+  "recall@20": 0.6989,
+  "precision@1": 0.4839,
+  "precision@3": 0.2581,
+  "precision@5": 0.1984,
+  "precision@10": 0.1476,
+  "precision@20": 0.1393,
+  "mrr": 0.5999,
+  "ctx_hit": 0.7742,
+  "ctx_mrr": 0.586,
+  "ctx_precision": 0.3237,
+  "unanswerable_ctx_empty": 0.0,
+  "avg_retrieval_s": 0.018,
+  "avg_rerank_s": 0.021,
+  "by_type": {
+    "factoid": {
+      "hit@5": 0.9231,
+      "mrr": 0.6795,
+      "ctx_hit": 0.9231
+    },
+    "specific": {
+      "hit@5": 0.8,
+      "mrr": 0.6875,
+      "ctx_hit": 0.8
+    },
+    "contextual": {
+      "hit@5": 0.6,
+      "mrr": 0.4778,
+      "ctx_hit": 0.8
+    },
+    "multi_doc": {
+      "hit@5": 0.3333,
+      "mrr": 0.1667,
+      "ctx_hit": 0.0
+    },
+    "unanswerable": {}
+  }
+}
