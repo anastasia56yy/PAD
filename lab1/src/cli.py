@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> None:
     ev.add_argument("--no-generation", action="store_true", help="retrieval metrics only (no LLM)")
     ex = sub.add_parser("experiments")
     ex.add_argument("--only", nargs="*", help="names of experiment groups to run")
+    ex.add_argument("--resume", action="store_true", help="reuse variants that already have summary.json")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -76,7 +77,7 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     elif args.command == "experiments":
         from experiments.run_experiments import run_all
-        run_all(cfg, only=args.only)
+        run_all(cfg, only=args.only, resume=args.resume)
 
 
 if __name__ == "__main__":

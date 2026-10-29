@@ -18,6 +18,7 @@ from src.config import LAB_ROOT, load_config, resolve, set_dotted
 from src.evaluation.run_eval import run_evaluation
 from src.indexing import build_index
 from src.preprocessing.process import process_documents
+from src.retrieval.vector_store import VectorStore
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +36,17 @@ def variant_config(base_cfg: dict, group: dict, overrides: dict) -> dict:
     return cfg
 
 
-def run_group(name: str, group: dict, base_cfg: dict) -> pd.DataFrame:
+def run_group(name: str, group: dict, base_cfg: dict, resume: bool = False) -> pd.DataFrame:
     rows = []
     for variant, overrides in group["variants"].items():
         cfg = variant_config(base_cfg, group, overrides)
         cfg["paths"]["results_dir"] = str(resolve(base_cfg["paths"]["results_dir"]) / name)
+        done = resolve(cfg["paths"]["results_dir"]) / variant / "summary.json"
+        if resume and done.exists():  # finished in an earlier (interrupted) run
+            log.info("%s/%s: reusing %s", name, variant, done)
+            summary = json.loads(done.read_text(encoding="utf-8"))
+            rows.append({"variant": variant, "chunks": VectorStore(cfg).count(), **summary})
+            continue
         index_info = build_index(cfg, reprocess=False)
         try:
             summary = run_evaluation(cfg, with_generation=group["generation"], run_name=variant)
@@ -57,7 +64,7 @@ def to_markdown(df: pd.DataFrame, cols: list[str]) -> str:
     return df[present].to_markdown(index=False, floatfmt=".3f")
 
 
-def run_all(base_cfg: dict | None = None, only: list[str] | None = None) -> None:
+def run_all(base_cfg: dict | None = None, only: list[str] | None = None, resume: bool = False) -> None:
     base_cfg = base_cfg or load_config()
     with open(LAB_ROOT / "configs" / "experiments.yaml", encoding="utf-8") as f:
         groups = yaml.safe_load(f)
@@ -70,7 +77,7 @@ def run_all(base_cfg: dict | None = None, only: list[str] | None = None) -> None
         if only and name not in only:
             continue
         log.info("=== Experiment group: %s ===", name)
-        df = run_group(name, group, base_cfg)
+        df = run_group(name, group, base_cfg, resume)
         if df.empty:
             continue
         cols = GENERATION_COLS if group["generation"] else RETRIEVAL_COLS

@@ -16,10 +16,19 @@ PREFIXES = {
 }
 
 
+def resolve_device(device: str = "auto") -> str:
+    """"auto" -> CUDA when a GPU build of torch sees a GPU, otherwise CPU."""
+    if device != "auto":
+        return device
+    import torch
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 @lru_cache(maxsize=4)
 def _load(model_name: str, device: str):
     from sentence_transformers import SentenceTransformer
-    log.info("Loading embedding model %s", model_name)
+    device = resolve_device(device)
+    log.info("Loading embedding model %s on %s", model_name, device)
     return SentenceTransformer(model_name, device=device)
 
 

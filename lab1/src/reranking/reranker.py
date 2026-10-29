@@ -11,21 +11,23 @@ import logging
 from dataclasses import replace
 from functools import lru_cache
 
+from ..embeddings.encoder import resolve_device
 from ..retrieval.vector_store import Hit
 
 log = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=2)
-def _load(model_name: str):
+def _load(model_name: str, device: str):
     from sentence_transformers import CrossEncoder
-    log.info("Loading reranker %s", model_name)
-    return CrossEncoder(model_name, max_length=512)
+    device = resolve_device(device)
+    log.info("Loading reranker %s on %s", model_name, device)
+    return CrossEncoder(model_name, max_length=512, device=device)
 
 
 class Reranker:
-    def __init__(self, model_name: str, top_n: int = 5, min_score: float | None = None):
-        self.model = _load(model_name)
+    def __init__(self, model_name: str, top_n: int = 5, min_score: float | None = None, device: str = "auto"):
+        self.model = _load(model_name, device)
         self.top_n = top_n
         self.min_score = min_score
 

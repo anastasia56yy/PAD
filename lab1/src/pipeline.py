@@ -63,7 +63,8 @@ class RAGPipeline:
         self.cfg = cfg
         self.retriever = Retriever(cfg)
         rr = cfg["reranker"]
-        self.reranker = Reranker(rr["model"], rr["top_n"], rr.get("min_score")) if rr["enabled"] else None
+        self.reranker = (Reranker(rr["model"], rr["top_n"], rr.get("min_score"), cfg["embeddings"]["device"])
+                         if rr["enabled"] else None)
         g = cfg["generation"]
         self.llm = OllamaLLM(g["model"], g["host"], g["temperature"], g["num_ctx"]) if with_generation else None
 
