@@ -5,6 +5,7 @@
     python -m src.cli ask "Cum se calculează nota finală?"
     python -m src.cli eval                      # retrieval + answer metrics on the question set
     python -m src.cli experiments               # run every experiment from configs/experiments.yaml
+    python -m src.cli serve                     # web interface on http://127.0.0.1:8000
 """
 from __future__ import annotations
 
@@ -48,6 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     ex = sub.add_parser("experiments")
     ex.add_argument("--only", nargs="*", help="names of experiment groups to run")
     ex.add_argument("--resume", action="store_true", help="reuse variants that already have summary.json")
+    sub.add_parser("serve", help="web interface on http://127.0.0.1:8000")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -78,6 +80,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "experiments":
         from experiments.run_experiments import run_all
         run_all(cfg, only=args.only, resume=args.resume)
+    elif args.command == "serve":
+        from app.server import main as serve
+        serve()
 
 
 if __name__ == "__main__":

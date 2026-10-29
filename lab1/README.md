@@ -63,6 +63,7 @@ lab1/
 │   ├── generation/             # llm.py (Ollama), prompts.py
 │   ├── evaluation/             # metrics.py, run_eval.py, judge.py, validate_questions.py
 │   ├── indexing.py, pipeline.py, cli.py
+├── app/                        # веб-интерфейс: server.py (FastAPI) + static/ (HTML/CSS/JS)
 ├── data/eval/questions.jsonl   # 38 вопросов
 ├── experiments/                # run_experiments.py, results/ (CSV, summary.json, REPORT.md)
 └── tests/                      # pytest, без сети и моделей
@@ -110,6 +111,24 @@ python -m src.cli experiments --resume # продолжить прерванны
 python -m src.evaluation.validate_questions
 pytest
 ```
+
+### Веб-интерфейс
+
+```bash
+python -m src.cli serve                # затем открыть http://127.0.0.1:8000
+```
+
+Одностраничный интерфейс поверх того же pipeline (`app/server.py` — FastAPI, `app/static/` — HTML/CSS/JS без фреймворков
+и внешних зависимостей):
+
+* вопрос на ro / en / ru, ответ со ссылками `[n]`; клик по ссылке подсвечивает карточку источника;
+* карточки источников: документ, сайт и раздел, исходный фрагмент текста (раскрывается) и ссылка на оригинал;
+* строка «как найден ответ»: сколько фрагментов найдено → прошло фильтры → попало в контекст модели, время ответа;
+* отдельное состояние «в базе нет ответа» и ошибка с кнопкой повтора, если не запущена Ollama;
+* светлая и тёмная тема по настройке системы, адаптивная вёрстка, уважение к `prefers-reduced-motion`.
+
+API: `POST /api/ask {"question": "..."}` → ответ, флаг отказа, источники и статистика pipeline; `GET /api/info` — размер корпуса и модели.
+Это же API станет одним из сервисов в лабораторной работе №2.
 
 ## 6. Configuration
 

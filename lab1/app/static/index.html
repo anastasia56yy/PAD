@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UTM Assistant</title>
+  <meta name="description" content="Ответы на вопросы об UTM и FCIM на основе официальных документов, со ссылками на источники.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231d1d1f'/%3E%3Cpath d='M10 10v7a6 6 0 0 0 12 0v-7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+  </div>
+
+  <header class="topbar glass">
+    <a class="brand" href="/" aria-label="UTM Assistant — на главную">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M7 6v6.5a5 5 0 0 0 10 0V6"/></svg>
+      </span>
+      <span class="brand-name">UTM Assistant</span>
+    </a>
+    <span class="topbar-meta" id="meta">Технический университет Молдовы</span>
+  </header>
+
+  <main class="main">
+    <section class="hero" id="hero">
+      <p class="eyebrow">RAG · utm.md · fcim.utm.md</p>
+      <h1 class="headline">
+        Спросите об&nbsp;университете.
+        <span class="headline-muted">Ответ&nbsp;— из&nbsp;официальных документов.</span>
+      </h1>
+      <p class="lede" id="lede">Регламенты, ECTS, стипендии, Erasmus+, факультет FCIM. На румынском, английском или русском — со&nbsp;ссылками на&nbsp;источники.</p>
+      <div class="suggestions" id="suggestions" role="list">
+        <button class="chip" type="button" role="listitem">Câte ore de muncă corespund unui credit ECTS?</button>
+        <button class="chip" type="button" role="listitem">Кто является деканом FCIM?</button>
+        <button class="chip" type="button" role="listitem">What documents do I need for Erasmus+?</button>
+        <button class="chip" type="button" role="listitem">De câte ori pot susține un examen restant?</button>
+      </div>
+    </section>
+
+    <section class="thread" id="thread" aria-live="polite" aria-label="Диалог"></section>
+  </main>
+
+  <form class="composer glass" id="composer" autocomplete="off">
+    <label class="sr-only" for="question">Ваш вопрос</label>
+    <textarea id="question" name="question" rows="1" maxlength="500"
+              placeholder="Задайте вопрос…" required></textarea>
+    <button class="send" id="send" type="submit" aria-label="Отправить вопрос">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+    </button>
+  </form>
+  <p class="fineprint">Ответы формирует локальная модель по найденным фрагментам. Проверяйте важное по ссылкам на источники.</p>
+
+  <template id="tpl-question">
+    <div class="msg msg-question"><p class="bubble"></p></div>
+  </template>
+
+  <template id="tpl-loading">
+    <article class="msg card glass is-loading" aria-busy="true">
+      <div class="card-head"><span class="pulse" aria-hidden="true"></span><span class="status">Ищу в документах…</span></div>
+      <div class="skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+    </article>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
