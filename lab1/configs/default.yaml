@@ -47,7 +47,7 @@ chunking:
 embeddings:
   model: intfloat/multilingual-e5-small
   batch_size: 32
-  device: cpu
+  device: auto            # cuda if a GPU build of torch sees a GPU, else cpu (also used by the reranker)
 
 vector_store:
   backend: chroma
