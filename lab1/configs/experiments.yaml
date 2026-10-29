@@ -1,0 +1,98 @@
+# One factor at a time: every variant starts from configs/default.yaml + `base`
+# of its group and changes only the listed keys.
+# generation: false -> retrieval metrics only (fast, no LLM needed)
+
+chunking_strategy:
+  description: Стратегия разбиения документов (reranker и threshold выключены, чтобы мерить чистый retrieval)
+  generation: false
+  base: {reranker.enabled: false, filters.score_threshold: null, filters.max_per_document: null}
+  variants:
+    fixed-800: {chunking.strategy: fixed, chunking.chunk_overlap: 0}
+    overlap-800-150: {chunking.strategy: overlap, chunking.chunk_overlap: 150}
+    paragraph-800: {chunking.strategy: paragraph}
+    heading-800: {chunking.strategy: heading}
+
+chunk_size:
+  description: Размер chunk для лучшей стратегии (heading)
+  generation: false
+  base: {reranker.enabled: false, filters.score_threshold: null, filters.max_per_document: null, chunking.strategy: heading}
+  variants:
+    size-400: {chunking.chunk_size: 400}
+    size-800: {chunking.chunk_size: 800}
+    size-1200: {chunking.chunk_size: 1200}
+    size-1600: {chunking.chunk_size: 1600}
+
+chunk_overlap:
+  description: Overlap для стратегии фиксированного окна 800 символов (overlap 0 = fixed-800 из первой группы)
+  generation: false
+  base: {reranker.enabled: false, filters.score_threshold: null, filters.max_per_document: null, chunking.strategy: overlap}
+  variants:
+    overlap-100: {chunking.chunk_overlap: 100}
+    overlap-200: {chunking.chunk_overlap: 200}
+    overlap-400: {chunking.chunk_overlap: 400}
+
+embeddings:
+  description: Embedding-модели (все многоязычные — корпус на ro/en/ru)
+  generation: false
+  base: {reranker.enabled: false, filters.score_threshold: null, filters.max_per_document: null}
+  variants:
+    e5-small: {embeddings.model: intfloat/multilingual-e5-small}
+    e5-base: {embeddings.model: intfloat/multilingual-e5-base}
+    minilm-l12: {embeddings.model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+
+reranker:
+  description: Retriever vs Retriever + Reranker (контекст LLM всегда 5 chunks)
+  generation: false
+  base: {filters.score_threshold: null}
+  variants:
+    no-reranker: {reranker.enabled: false}
+    with-reranker: {reranker.enabled: true}
+
+top_k:
+  description: Сколько кандидатов retriever передаёт reranker'у (K)
+  generation: false
+  base: {filters.score_threshold: null, reranker.enabled: true}
+  variants:
+    k-3: {retrieval.top_k: 3}
+    k-5: {retrieval.top_k: 5}
+    k-10: {retrieval.top_k: 10}
+    k-20: {retrieval.top_k: 20}
+    k-40: {retrieval.top_k: 40}
+
+threshold:
+  description: Порог cosine similarity (до reranker) — компромисс между потерей ответов и отсечением вопросов вне базы
+  generation: false
+  base: {reranker.enabled: true, reranker.min_score: null}
+  variants:
+    none: {filters.score_threshold: null}
+    t-0.75: {filters.score_threshold: 0.75}
+    t-0.80: {filters.score_threshold: 0.80}
+    t-0.83: {filters.score_threshold: 0.83}
+    t-0.86: {filters.score_threshold: 0.86}
+
+rerank_threshold:
+  description: Порог по score cross-encoder (после reranker) — альтернатива cosine-порогу
+  generation: false
+  base: {reranker.enabled: true, filters.score_threshold: 0.75}
+  variants:
+    none: {reranker.min_score: null}
+    r-minus2: {reranker.min_score: -2.0}
+    r-0: {reranker.min_score: 0.0}
+    r-1: {reranker.min_score: 1.0}
+    r-2: {reranker.min_score: 2.0}
+
+llm:
+  description: Две LLM при одинаковом контексте
+  generation: true
+  base: {}
+  variants:
+    qwen2.5-3b: {generation.model: "qwen2.5:3b"}
+    llama3.2-3b: {generation.model: "llama3.2:3b"}
+
+prompt:
+  description: Базовый prompt vs строгий (только контекст, цитаты, фраза-отказ)
+  generation: true
+  base: {}
+  variants:
+    basic: {generation.prompt: basic}
+    strict: {generation.prompt: strict}
