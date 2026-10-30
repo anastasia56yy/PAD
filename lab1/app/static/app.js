@@ -146,6 +146,10 @@ function answerNode(data) {
       </div>`;
   } else {
     body = `<div class="answer">${renderAnswer(data.answer, data.sources.length)}</div>`;
+    // a 3B model ignores "say it is FCIM only", so the scope note is added deterministically
+    if (data.sources[0]?.site === "fcim") {
+      body += `<p class="hint-inline">Основной источник — сайт факультета FCIM: сведения могут касаться только этого факультета, а не всего университета.</p>`;
+    }
     if (data.confidence === "low") {
       body += `<p class="hint-inline">Запрос короткий или общий — фрагменты подобраны неуверенно. Уточните вопрос, например «Сколько длится магистратура?».</p>`;
     }

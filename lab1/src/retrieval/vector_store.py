@@ -63,6 +63,13 @@ class VectorStore:
             self.collection.add(ids=ids[i:i + batch], documents=texts[i:i + batch],
                                 embeddings=embeddings[i:i + batch].tolist(), metadatas=metadatas[i:i + batch])
 
+    def get(self, ids: list[str]) -> dict[str, tuple[str, dict]]:
+        """Chunks by id (missing ids are simply absent): {id: (text, metadata)}."""
+        if not ids:
+            return {}
+        res = self.collection.get(ids=ids, include=["documents", "metadatas"])
+        return {cid: (doc, meta) for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"])}
+
     def search(self, query_embedding: np.ndarray, k: int, where: dict | None = None) -> list[Hit]:
         res = self.collection.query(query_embeddings=[query_embedding.tolist()], n_results=k, where=where,
                                     include=["documents", "metadatas", "distances"])

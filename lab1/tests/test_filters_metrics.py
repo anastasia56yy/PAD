@@ -62,7 +62,8 @@ def test_question_language_and_refusal_detection():
     assert detect_question_lang("Когда начинается сессия?") == "ru"
     assert detect_question_lang("Când începe sesiunea?") == "ro"
     assert detect_question_lang("When does the session start?") == "en"
-    assert is_refusal(REFUSALS["en"])
+    assert all(is_refusal(r) for r in REFUSALS.values())
+    assert is_refusal("Nu am suficientă informații în sursele disponibile pentru a răspunde. [1]")  # changed ending
     assert not is_refusal("The session starts on 5 January [1].")
 
 
@@ -98,3 +99,21 @@ def test_two_tier_reranker_threshold():
     assert pipe._apply_confidence([noise]) == ([], "none")
     pipe.cfg = {"reranker": {"min_score": 0.0, "soft_min_score": None}}
     assert pipe._apply_confidence([weak]) == ([], "none")
+
+
+def test_expand_with_neighbors_merges_adjacent_chunks():
+    from src.retrieval.expansion import expand_with_neighbors
+
+    class FakeStore:
+        chunks = {f"d1#{i}": (f"Doc | Sec\npart {i}", {}) for i in range(5)}
+        def get(self, ids):
+            return {i: self.chunks[i] for i in ids if i in self.chunks}
+
+    def h(idx, score):
+        return Hit(f"d1#{idx}", f"Doc | Sec\npart {idx}", score, {"document_id": "d1", "chunk_index": idx, "title": "Doc"})
+
+    passages = expand_with_neighbors([h(1, 0.3), h(2, -0.7)], FakeStore(), 1)
+    assert len(passages) == 1                      # chunks 0..3 form one contiguous passage
+    assert passages[0].text == "Doc | Sec\npart 0\npart 1\npart 2\npart 3"
+    assert passages[0].score == 0.3
+    assert expand_with_neighbors([h(1, 0.3)], FakeStore(), 0)[0].chunk_id == "d1#1"   # window 0 = unchanged

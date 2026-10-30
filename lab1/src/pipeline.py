@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 
 from .generation.llm import OllamaLLM
 from .generation.prompts import LANGUAGE_NAMES, REFUSALS, TRANSLATE, build_messages
 from .reranking.reranker import Reranker
+from .retrieval.expansion import expand_with_neighbors
 from .retrieval.filters import apply_filters
 from .retrieval.retriever import Retriever
 from .retrieval.vector_store import Hit
@@ -37,9 +39,19 @@ def detect_text_lang(text: str) -> str:
     return "ro" if ro > en else "en"
 
 
+# Core of each refusal sentence, without diacritics: the model sometimes changes an ending
+# ("Nu am suficientă informații" instead of "suficiente"), which an exact match counted as an answer
+REFUSAL_CORES = ("nu am suficient", "not have enough information", "недостаточно информации")
+
+
+def _fold(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text.lower())
+    return "".join(c for c in text if not unicodedata.combining(c))
+
+
 def is_refusal(answer: str) -> bool:
-    low = answer.lower()
-    return any(r.lower().rstrip(".") in low for r in REFUSALS.values())
+    folded = _fold(answer)
+    return any(_fold(core) in folded for core in REFUSAL_CORES)
 
 
 def sanitize_citations(answer: str, n_sources: int) -> tuple[str, int]:
@@ -116,6 +128,10 @@ class RAGPipeline:
         hard, soft = rr.get("min_score"), rr.get("soft_min_score")
         confident = [h for h in ranked if hard is None or h.score >= hard]
         if confident:
+            if rr.get("fill_from_soft") and soft is not None:
+                # the question is answerable: complete the context with the soft-zone chunks too
+                # (one confident chunk alone gave a partial answer to "какие есть программы магистратуры")
+                return [h for h in ranked if h.score >= soft], "high"
             return confident, "high"
         low = [h for h in ranked if soft is not None and h.score >= soft]
         return low, ("low" if low else "none")
@@ -133,7 +149,10 @@ class RAGPipeline:
         else:
             hits = hits[:self.cfg["reranker"]["top_n"]]  # same context size with and without reranker
             confidence = "high" if hits else "none"
-        trace.update(retrieval_s=t1 - t0, rerank_s=time.perf_counter() - t1, context=len(hits), confidence=confidence)
+        selected = len(hits)
+        hits = expand_with_neighbors(hits, self.retriever.store, self.cfg["retrieval"].get("neighbor_window", 0))
+        trace.update(retrieval_s=t1 - t0, rerank_s=time.perf_counter() - t1, context=len(hits),
+                     selected=selected, confidence=confidence)
         return hits, retrieved, trace
 
     def answer(self, question: str) -> RAGResult:
@@ -153,7 +172,7 @@ class RAGPipeline:
         messages, used = build_messages(prompt, question, hits, self.cfg["generation"]["max_context_chars"], lang)
         answer, gen_s = self.llm.chat(messages)
         translated = False
-        if prompt == "strict_v2" and not is_refusal(answer) and detect_text_lang(answer) != lang:
+        if prompt in ("strict_v2", "strict_v3") and not is_refusal(answer) and detect_text_lang(answer) != lang:
             # 3B models drift into the language of the (mostly Romanian) context; one extra short call fixes it
             answer, extra_s = self.llm.chat([{"role": "user", "content": TRANSLATE.format(
                 language=LANGUAGE_NAMES[lang], answer=answer)}])

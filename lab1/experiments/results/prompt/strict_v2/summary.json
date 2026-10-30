@@ -24,11 +24,12 @@
   "keyword_recall": 0.6828,
   "citation": 0.9677,
   "unanswerable_ctx_empty": 0.8571,
-  "refusal_accuracy": 0.8947,
-  "false_refusal_rate": 0.129,
+  "refusal_accuracy": 0.8421,
+  "false_refusal_rate": 0.1935,
   "correct_refusal_rate": 1.0,
   "avg_latency_s": 3.8945,
   "lang_match": 0.9737,
+  "low_confidence_rate": null,
   "invalid_citation_rate": 0.0,
   "avg_retrieval_s": 0.038,
   "avg_rerank_s": 0.125,
@@ -45,7 +46,7 @@
       "mrr": 0.9,
       "ctx_hit": 0.9,
       "keyword_recall": 0.6167,
-      "refusal_correct": 0.9
+      "refusal_correct": 0.7
     },
     "contextual": {
       "hit@5": 0.8,

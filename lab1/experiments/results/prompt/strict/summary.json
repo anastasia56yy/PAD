@@ -29,6 +29,7 @@
   "correct_refusal_rate": 1.0,
   "avg_latency_s": 3.6489,
   "lang_match": 0.8947,
+  "low_confidence_rate": null,
   "invalid_citation_rate": 0.0526,
   "avg_retrieval_s": 0.042,
   "avg_rerank_s": 0.13,

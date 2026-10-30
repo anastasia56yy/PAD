@@ -1,4 +1,4 @@
-# Base configuration of the RAG pipeline.
+﻿# Base configuration of the RAG pipeline.
 # Every experiment in configs/experiments.yaml overrides only part of these keys.
 
 paths:
@@ -55,6 +55,7 @@ vector_store:
 
 retrieval:
   top_k: 20               # candidates passed on to the filters/reranker
+  neighbor_window: 1      # widen each context chunk with ±N neighbouring chunks of its document (small-to-big)
 
 filters:
   score_threshold: 0.75   # cosine similarity; cheap pre-filter only (e5 scores are compressed into 0.75-0.95)
@@ -70,6 +71,7 @@ reranker:
   min_score: 0.0          # cross-encoder logit; separates "no answer in the base" much better than cosine
   soft_min_score: -3.0    # between this and min_score: context still goes to the LLM, marked low confidence
                           # (single keywords like "магистратура" score ~ -0.5 even with the right document first)
+  fill_from_soft: true    # when some chunk is confident, also pass the soft-zone chunks to the LLM
 
 generation:
   backend: ollama
@@ -77,7 +79,7 @@ generation:
   model: qwen2.5:3b
   temperature: 0.1
   num_ctx: 4096
-  prompt: strict_v2       # basic | strict | strict_v2  (see src/generation/prompts.py)
+  prompt: strict_v3       # basic | strict | strict_v2 | strict_v3 (see src/generation/prompts.py)
   max_context_chars: 6000
 
 evaluation:

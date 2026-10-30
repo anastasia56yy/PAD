@@ -47,22 +47,36 @@ Rules:
    "{refusal}"
    If you can answer, never add this sentence."""
 
+# v3 adds two rules found by asking list questions in the web interface:
+# - "programe de doctorat" was answered with the FCIM faculty's list presented as the whole university's;
+# - "программы магистратуры" got only part of a list, without saying the list was incomplete.
+STRICT_V3 = STRICT_V2 + """
+6. Each fragment says whose website it comes from. Fragments from the FCIM faculty website describe only that
+   faculty: when you use them, say so (e.g. "at FCIM ..."), never present them as covering the whole university.
+7. When asked to list items (programmes, documents, steps), list every item the fragments contain; if the
+   fragments show only part of a longer list, say that the full list is in the cited source."""
+
+SITE_LABELS = {"utm": "UTM university website (utm.md)", "fcim": "FCIM faculty website (fcim.utm.md) — FCIM only"}
+
 TRANSLATE = """Translate the following answer into {language}. Keep every number, name, e-mail address and
 citation such as [1] exactly as it is. Output only the translation.
 
 {answer}"""
 
-PROMPTS = {"basic": BASIC, "strict": STRICT, "strict_v2": STRICT_V2}
+PROMPTS = {"basic": BASIC, "strict": STRICT, "strict_v2": STRICT_V2, "strict_v3": STRICT_V3}
 
 LANGUAGE_NAMES = {"ro": "Romanian", "en": "English", "ru": "Russian"}
 
 
-def format_context(hits) -> str:
+def format_context(hits, site_labels: bool = False) -> str:
     parts = []
     for i, h in enumerate(hits, 1):
         m = h.metadata
         header = f"[{i}] {m.get('title', '')}" + (f" — {m['section']}" if m.get("section") else "")
-        parts.append(f"{header}\nSource: {m.get('url', '')}\n{h.text}")
+        source = f"Source: {m.get('url', '')}"
+        if site_labels and m.get("source") in SITE_LABELS:
+            source += f"\nWebsite: {SITE_LABELS[m['source']]}"
+        parts.append(f"{header}\n{source}\n{h.text}")
     return "\n\n".join(parts)
 
 
@@ -75,9 +89,9 @@ def build_messages(prompt_name: str, question: str, hits, max_context_chars: int
             break
         context.append(h)
         used += len(h.text)
-    user = f"Context:\n{format_context(context)}\n\nQuestion: {question}"
+    user = f"Context:\n{format_context(context, site_labels=prompt_name == 'strict_v3')}\n\nQuestion: {question}"
     system = PROMPTS[prompt_name]
-    if prompt_name == "strict_v2":
+    if prompt_name in ("strict_v2", "strict_v3"):
         system = system.format(refusal=REFUSALS[answer_lang])
         # the last line before generation is what a small model follows most reliably, so it carries
         # the answer language (putting the refusal sentence there made the model refuse too often)

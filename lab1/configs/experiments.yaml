@@ -105,3 +105,13 @@ soft_threshold:
   variants:
     hard-only: {reranker.soft_min_score: null}
     soft-minus3: {reranker.soft_min_score: -3.0}
+context_expansion:
+  description: Полнота контекста — соседние chunks того же документа (small-to-big) и добор chunks из мягкой зоны reranker
+  generation: true
+  base: {generation.prompt: strict_v2, reranker.soft_min_score: -3.0}
+  variants:
+    baseline: {retrieval.neighbor_window: 0, reranker.fill_from_soft: false}
+    neighbors: {retrieval.neighbor_window: 1, reranker.fill_from_soft: false}
+    fill-soft: {retrieval.neighbor_window: 0, reranker.fill_from_soft: true}
+    both: {retrieval.neighbor_window: 1, reranker.fill_from_soft: true}
+    both-v3: {retrieval.neighbor_window: 1, reranker.fill_from_soft: true, generation.prompt: strict_v3}
