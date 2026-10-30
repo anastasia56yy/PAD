@@ -25,7 +25,8 @@ log = logging.getLogger(__name__)
 # Columns shown in the report, depending on what the group measures
 RETRIEVAL_COLS = ["hit@1", "hit@5", "hit@10", "recall@5", "mrr", "ctx_hit", "ctx_mrr", "ctx_precision",
                   "unanswerable_ctx_empty", "avg_retrieval_s", "avg_rerank_s"]
-GENERATION_COLS = ["ctx_hit", "keyword_recall", "citation", "invalid_citation_rate", "lang_match", "refusal_accuracy",
+GENERATION_COLS = ["ctx_hit", "keyword_recall", "citation", "invalid_citation_rate", "lang_match", "low_confidence_rate",
+                   "refusal_accuracy",
                    "false_refusal_rate", "correct_refusal_rate", "correctness", "faithfulness", "avg_latency_s"]
 
 

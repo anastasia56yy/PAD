@@ -68,6 +68,8 @@ reranker:
   model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
   top_n: 5
   min_score: 0.0          # cross-encoder logit; separates "no answer in the base" much better than cosine
+  soft_min_score: -3.0    # between this and min_score: context still goes to the LLM, marked low confidence
+                          # (single keywords like "магистратура" score ~ -0.5 even with the right document first)
 
 generation:
   backend: ollama

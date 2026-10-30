@@ -193,6 +193,18 @@ body.has-thread .hero.is-gone { display: none; }
   font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--text-2);
 }
 .card-head .spacer { flex: 1; }
+.tag-low { background: var(--warn-bg); color: var(--warn-ink); }
+.hint-inline { margin: 12px 0 0; font-size: 14px; color: var(--text-3); }
+
+.related { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.related a {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 14px;
+  border-radius: 14px; background: var(--glass-strong); border: 1px solid var(--hairline);
+  color: var(--text); font-size: 15px; font-weight: 500;
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.related a:hover { text-decoration: none; transform: translateX(3px); }
+.related svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--text-3); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .timing { font-variant-numeric: tabular-nums; }
 
 .answer { font-size: 17px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; }

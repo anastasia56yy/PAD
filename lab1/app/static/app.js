@@ -130,6 +130,8 @@ function answerNode(data) {
       <span class="dot" aria-hidden="true"></span>
       <span class="status">${data.refused ? "В базе нет ответа" : "Ответ"}</span>
       <span class="tag">${LANG[data.lang] || ""}</span>
+      ${!data.refused && data.confidence === "low"
+        ? '<span class="tag tag-low" title="Найденные фрагменты слабо совпадают с вопросом">низкая уверенность</span>' : ""}
       <span class="spacer"></span>
       <span class="timing">${st.total_s.toFixed(1)} с</span>
     </div>`;
@@ -144,6 +146,12 @@ function answerNode(data) {
       </div>`;
   } else {
     body = `<div class="answer">${renderAnswer(data.answer, data.sources.length)}</div>`;
+    if (data.confidence === "low") {
+      body += `<p class="hint-inline">Запрос короткий или общий — фрагменты подобраны неуверенно. Уточните вопрос, например «Сколько длится магистратура?».</p>`;
+    }
+  }
+  if (data.refused && data.related?.length) {
+    body += `<h2 class="sources-title">Похожие документы в базе</h2><ul class="related"></ul>`;
   }
 
   const pipeline = `
@@ -159,6 +167,14 @@ function answerNode(data) {
 
   card.innerHTML = head + body + pipeline + sources;
   if (data.refused) $(".notice p", card).textContent = data.answer;
+  const relatedList = $(".related", card);
+  if (relatedList) data.related.forEach(r => {
+    const li = document.createElement("li");
+    li.innerHTML = `<a target="_blank" rel="noopener noreferrer">${ICONS.external}<span></span></a>`;
+    $("a", li).href = r.url;
+    $("span", li).textContent = r.title || hostOf(r.url);
+    relatedList.appendChild(li);
+  });
 
   const grid = $(".sources", card);
   if (grid) data.sources.forEach(s => grid.appendChild(sourceNode(s, id)));

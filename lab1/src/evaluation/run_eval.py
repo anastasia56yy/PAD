@@ -63,6 +63,7 @@ def evaluate_question(pipe: RAGPipeline, q: dict, k_values: list[int], with_gene
         row["refusal_correct"] = float(row["refused"] == (0.0 if answerable else 1.0))
         row["latency_s"] = round(trace.get("total_s", 0.0), 2)
         row["lang_match"] = float(detect_text_lang(result.answer) == q.get("lang"))
+        row["low_confidence"] = float(result.confidence == "low")
         row["invalid_citations"] = float(trace.get("invalid_citations", 0) > 0)
         if answerable:
             row["keyword_recall"] = keyword_recall(result.answer, q.get("keywords", []))
@@ -89,6 +90,7 @@ def summarize(rows: list[dict], k_values: list[int]) -> dict:
         summary["correct_refusal_rate"] = _avg(unanswerable, "refused")
         summary["avg_latency_s"] = _avg(rows, "latency_s")
         summary["lang_match"] = _avg(rows, "lang_match")
+        summary["low_confidence_rate"] = _avg(rows, "low_confidence")
         summary["invalid_citation_rate"] = _avg(rows, "invalid_citations")
     summary["avg_retrieval_s"] = round(mean(r["trace"].get("retrieval_s", 0) for r in rows), 3)
     summary["avg_rerank_s"] = round(mean(r["trace"].get("rerank_s", 0) for r in rows), 3)

@@ -1,4 +1,4 @@
-# One factor at a time: every variant starts from configs/default.yaml + `base`
+﻿# One factor at a time: every variant starts from configs/default.yaml + `base`
 # of its group and changes only the listed keys.
 # generation: false -> retrieval metrics only (fast, no LLM needed)
 
@@ -43,7 +43,7 @@ embeddings:
 reranker:
   description: Retriever vs Retriever + Reranker (контекст LLM всегда 5 chunks)
   generation: false
-  base: {filters.score_threshold: null}
+  base: {filters.score_threshold: null, reranker.soft_min_score: null}
   variants:
     no-reranker: {reranker.enabled: false}
     with-reranker: {reranker.enabled: true}
@@ -51,7 +51,7 @@ reranker:
 top_k:
   description: Сколько кандидатов retriever передаёт reranker'у (K)
   generation: false
-  base: {filters.score_threshold: null, reranker.enabled: true}
+  base: {filters.score_threshold: null, reranker.enabled: true, reranker.soft_min_score: null}
   variants:
     k-3: {retrieval.top_k: 3}
     k-5: {retrieval.top_k: 5}
@@ -62,7 +62,7 @@ top_k:
 threshold:
   description: Порог cosine similarity (до reranker) — компромисс между потерей ответов и отсечением вопросов вне базы
   generation: false
-  base: {reranker.enabled: true, reranker.min_score: null}
+  base: {reranker.enabled: true, reranker.min_score: null, reranker.soft_min_score: null}
   variants:
     none: {filters.score_threshold: null}
     t-0.75: {filters.score_threshold: 0.75}
@@ -73,7 +73,7 @@ threshold:
 rerank_threshold:
   description: Порог по score cross-encoder (после reranker) — альтернатива cosine-порогу
   generation: false
-  base: {reranker.enabled: true, filters.score_threshold: 0.75}
+  base: {reranker.enabled: true, filters.score_threshold: 0.75, reranker.soft_min_score: null}
   variants:
     none: {reranker.min_score: null}
     r-minus2: {reranker.min_score: -2.0}
@@ -84,7 +84,7 @@ rerank_threshold:
 llm:
   description: Две LLM при одинаковом контексте
   generation: true
-  base: {}
+  base: {reranker.soft_min_score: null}
   variants:
     qwen2.5-3b: {generation.model: "qwen2.5:3b"}
     llama3.2-3b: {generation.model: "llama3.2:3b"}
@@ -92,8 +92,16 @@ llm:
 prompt:
   description: Базовый prompt vs строгий (только контекст, цитаты, фраза-отказ) vs строгий v2 (язык ответа и диапазон цитат в конце сообщения, правило противоречий)
   generation: true
-  base: {}
+  base: {reranker.soft_min_score: null}
   variants:
     basic: {generation.prompt: basic}
     strict: {generation.prompt: strict}
     strict_v2: {generation.prompt: strict_v2}
+
+soft_threshold:
+  description: Мягкий порог reranker — контекст с оценкой между soft_min_score и 0 всё равно идёт в LLM с пометкой «низкая уверенность» (короткие запросы-ключевые слова)
+  generation: true
+  base: {generation.prompt: strict_v2}
+  variants:
+    hard-only: {reranker.soft_min_score: null}
+    soft-minus3: {reranker.soft_min_score: -3.0}

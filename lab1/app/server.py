@@ -77,11 +77,18 @@ def ask(body: Question) -> dict:
             "site": m.get("source"), "type": m.get("doc_type"), "lang": m.get("lang"),
             "score": round(h.score, 2), "text": h.text,
         })
+    related, seen = [], set()
+    for h in result.related if result.refused else []:
+        if h.metadata.get("url") not in seen:
+            seen.add(h.metadata.get("url"))
+            related.append({"title": h.metadata.get("title"), "url": h.metadata.get("url")})
     return {
         "question": question,
         "lang": detect_question_lang(question),
         "answer": result.answer,
         "refused": result.refused,
+        "confidence": result.confidence,
+        "related": related,
         "sources": sources,
         "stats": {
             "retrieved": t.get("retrieved", 0),

@@ -66,6 +66,8 @@ class RAGResult:
     sources: list[Hit]
     retrieved: list[Hit] = field(default_factory=list)   # raw top-K before filters
     trace: dict = field(default_factory=dict)
+    confidence: str = "high"                             # high | low | none (see RAGPipeline.retrieve_context)
+    related: list[Hit] = field(default_factory=list)     # best reranked chunks, shown as "similar documents" on refusal
 
     def to_dict(self) -> dict:
         def hit(h: Hit) -> dict:
@@ -95,10 +97,28 @@ class RAGPipeline:
         self.cfg = cfg
         self.retriever = Retriever(cfg)
         rr = cfg["reranker"]
-        self.reranker = (Reranker(rr["model"], rr["top_n"], rr.get("min_score"), cfg["embeddings"]["device"])
-                         if rr["enabled"] else None)
+        # thresholds are applied here, not inside the reranker, so the best candidates are known even when
+        # all of them are below the threshold (they become "similar documents" on a refusal)
+        self.reranker = Reranker(rr["model"], rr["top_n"], None, cfg["embeddings"]["device"]) if rr["enabled"] else None
         g = cfg["generation"]
         self.llm = OllamaLLM(g["model"], g["host"], g["temperature"], g["num_ctx"]) if with_generation else None
+
+    def _apply_confidence(self, ranked: list[Hit]) -> tuple[list[Hit], str]:
+        """Two-tier reranker threshold.
+
+        score >= min_score       -> confident context
+        soft_min_score <= score  -> low confidence: the LLM still gets the context and decides itself
+                                    (keywords and vague questions like "магистратура" score below 0
+                                    even when the right document is first)
+        below soft_min_score     -> no context, refusal without calling the LLM
+        """
+        rr = self.cfg["reranker"]
+        hard, soft = rr.get("min_score"), rr.get("soft_min_score")
+        confident = [h for h in ranked if hard is None or h.score >= hard]
+        if confident:
+            return confident, "high"
+        low = [h for h in ranked if soft is not None and h.score >= soft]
+        return low, ("low" if low else "none")
 
     def retrieve_context(self, question: str) -> tuple[list[Hit], list[Hit], dict]:
         """Everything before the LLM. Returns (context hits, raw retrieved hits, trace)."""
@@ -107,21 +127,26 @@ class RAGPipeline:
         t1 = time.perf_counter()
         hits, trace = apply_filters(retrieved, self.cfg)
         if self.reranker:
-            hits = self.reranker.rerank(question, hits)
+            ranked = self.reranker.rerank(question, hits)
+            hits, confidence = self._apply_confidence(ranked)
+            trace["ranked"] = ranked
         else:
             hits = hits[:self.cfg["reranker"]["top_n"]]  # same context size with and without reranker
-        trace.update(retrieval_s=t1 - t0, rerank_s=time.perf_counter() - t1, context=len(hits))
+            confidence = "high" if hits else "none"
+        trace.update(retrieval_s=t1 - t0, rerank_s=time.perf_counter() - t1, context=len(hits), confidence=confidence)
         return hits, retrieved, trace
 
     def answer(self, question: str) -> RAGResult:
         start = time.perf_counter()
         hits, retrieved, trace = self.retrieve_context(question)
+        related = trace.pop("ranked", [])[:3]
+        confidence = trace["confidence"]
 
         if not hits:
-            # nothing passed the similarity threshold: refuse without asking the LLM at all
+            # nothing passed the thresholds: refuse without asking the LLM at all
             answer = REFUSALS[detect_question_lang(question)]
             trace.update(to_llm=0, generation_s=0.0, total_s=time.perf_counter() - start)
-            return RAGResult(question, answer, True, [], retrieved, trace)
+            return RAGResult(question, answer, True, [], retrieved, trace, confidence, related)
 
         lang = detect_question_lang(question)
         prompt = self.cfg["generation"]["prompt"]
@@ -137,4 +162,4 @@ class RAGPipeline:
         answer, bad_citations = sanitize_citations(answer, len(used))
         trace.update(to_llm=len(used), generation_s=gen_s, total_s=time.perf_counter() - start,
                      invalid_citations=bad_citations, translated=translated)
-        return RAGResult(question, answer, is_refusal(answer), used, retrieved, trace)
+        return RAGResult(question, answer, is_refusal(answer), used, retrieved, trace, confidence, related)

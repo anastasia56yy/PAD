@@ -86,3 +86,15 @@ def test_strict_v2_states_answer_language_and_citation_range():
     assert "[1]-[2]" in user
     assert REFUSALS["en"] in messages[0]["content"] and REFUSALS["ro"] not in messages[0]["content"]
     assert len(used) == 2
+
+
+def test_two_tier_reranker_threshold():
+    from src.pipeline import RAGPipeline
+    pipe = RAGPipeline.__new__(RAGPipeline)  # only the threshold logic, no models
+    pipe.cfg = {"reranker": {"min_score": 0.0, "soft_min_score": -3.0}}
+    strong, weak, noise = hit("a", 1.5), hit("b", -0.5), hit("c", -4.0)
+    assert pipe._apply_confidence([strong, weak, noise]) == ([strong], "high")
+    assert pipe._apply_confidence([weak, noise]) == ([weak], "low")
+    assert pipe._apply_confidence([noise]) == ([], "none")
+    pipe.cfg = {"reranker": {"min_score": 0.0, "soft_min_score": None}}
+    assert pipe._apply_confidence([weak]) == ([], "none")
