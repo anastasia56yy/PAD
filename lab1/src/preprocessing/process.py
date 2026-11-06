@@ -22,7 +22,8 @@ def process_documents(cfg: dict) -> Path:
     kept = skipped = 0
     with open(out_path, "w", encoding="utf-8") as out:
         for meta in sorted(manifest.active_documents(), key=lambda d: d["doc_id"]):
-            raw = json.loads((raw_dir / meta["path"]).read_text(encoding="utf-8"))
+            # manifests written on Windows before the fix store "site\\type\\id.json"
+            raw = json.loads((raw_dir / meta["path"].replace("\\", "/")).read_text(encoding="utf-8"))
             text = clean_document(raw["body"], raw["body_format"], pp["drop_selectors"])
             if len(text) < pp["min_doc_chars"]:
                 skipped += 1  # empty landing pages, sliders, "test" pages

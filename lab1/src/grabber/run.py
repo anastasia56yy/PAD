@@ -80,7 +80,9 @@ class Grabber:
 
         self.manifest.upsert(doc_id=doc_id, site=site, doc_type=doc_type, url=doc.url, title=doc.title,
                              lang=doc.lang, modified=doc.modified, content_hash=h,
-                             path=str(path.relative_to(self.raw_dir)), status="active", duplicate_of=None, error=None)
+                             # POSIX separators: the manifest is portable between Windows and Linux containers
+                             path=path.relative_to(self.raw_dir).as_posix(), status="active", duplicate_of=None,
+                             error=None)
         self.stats["updated" if previous and previous.status == "active" else "new"] += 1
 
     def _error(self, site: str, doc_type: str, item: ListingItem, exc: Exception) -> None:
