@@ -1,0 +1,25 @@
+# Image for the light services (auth, user, history, notification, gateway).
+# Build context: the repository root (see docker-compose.yml). SERVICE_DIR selects the service code.
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+# dependencies first: this layer is cached until requirements change
+COPY lab2/common/requirements.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt
+
+COPY lab2/common/utm_common /app/utm_common
+ARG SERVICE_DIR
+COPY ${SERVICE_DIR}/app /app/app
+
+# never run as root
+RUN useradd --create-home --uid 10001 appuser
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

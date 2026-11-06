@@ -1,0 +1,11 @@
+# Build context is the repository root: send only the code the images need
+**
+!lab1/src/**
+!lab1/configs/**
+!lab2/common/**
+!lab2/services/**
+!lab2/gateway/**
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/tests

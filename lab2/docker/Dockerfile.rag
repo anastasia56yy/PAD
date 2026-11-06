@@ -1,0 +1,33 @@
+# Image for the services built on the lab1 RAG code (search, answer, ingestion).
+# Build context: the repository root. CPU-only torch keeps the image ~2 GB smaller than the CUDA build.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app \
+    RAG_ROOT=/app/rag \
+    HF_HOME=/models \
+    HF_HUB_DISABLE_PROGRESS_BARS=1 \
+    TRANSFORMERS_VERBOSITY=error
+
+WORKDIR /app
+
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+COPY lab2/common/requirements.txt /tmp/requirements.txt
+COPY lab2/common/requirements-rag.txt /tmp/requirements-rag.txt
+RUN pip install -r /tmp/requirements.txt -r /tmp/requirements-rag.txt
+
+# lab1 code and its tuned configuration (the data directory is a volume, not part of the image)
+COPY lab1/src /app/rag/src
+COPY lab1/configs /app/rag/configs
+COPY lab2/common/utm_common /app/utm_common
+ARG SERVICE_DIR
+COPY ${SERVICE_DIR}/app /app/app
+
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /models /data && chown appuser /models /data
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
