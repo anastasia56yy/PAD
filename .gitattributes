@@ -1,0 +1,5 @@
+# shell scripts run inside Linux containers: never convert them to CRLF
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile* text eol=lf
