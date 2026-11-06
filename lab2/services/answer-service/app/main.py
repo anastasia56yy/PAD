@@ -44,7 +44,8 @@ def generate(question: str, hits: list) -> tuple[str, list, dict]:
     """The generation half of the lab1 pipeline (prompt v3, translation fallback, citation check)."""
     from src.generation.llm import OllamaLLM  # noqa: PLC0415
     from src.generation.prompts import LANGUAGE_NAMES, TRANSLATE, build_messages  # noqa: PLC0415
-    from src.pipeline import detect_question_lang, detect_text_lang, is_refusal, sanitize_citations  # noqa: PLC0415
+    from src.pipeline import (detect_question_lang, detect_text_lang, is_refusal,  # noqa: PLC0415
+                              sanitize_citations, strip_trailing_refusal)
 
     g = cfg["generation"]
     llm = OllamaLLM(g["model"], g["host"], g["temperature"], g["num_ctx"], timeout_s=LLM_TIMEOUT)
@@ -62,6 +63,7 @@ def generate(question: str, hits: list) -> tuple[str, list, dict]:
         raise ServiceError(503, "llm_unavailable", str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 - e.g. read timeout of a long generation
         raise ServiceError(504, "llm_timeout", "The language model did not answer in time") from exc
+    answer = strip_trailing_refusal(answer)
     answer, bad = sanitize_citations(answer, len(used))
     return answer, used, {"generation_s": round(gen_s, 2), "translated": translated, "invalid_citations": bad}
 

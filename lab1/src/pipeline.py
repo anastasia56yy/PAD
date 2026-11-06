@@ -54,6 +54,20 @@ def is_refusal(answer: str) -> bool:
     return any(_fold(core) in folded for core in REFUSAL_CORES)
 
 
+def strip_trailing_refusal(answer: str, min_letters: int = 20) -> str:
+    """qwen sometimes answers correctly and then appends the refusal sentence
+    ("Rectorul UTM este Viorel Bostan [1]. Nu am suficiente informații..."). When there is a real answer
+    before the refusal, drop the refusal so the answer is not shown (and counted) as "no answer"."""
+    folded = _fold(answer)
+    for core in REFUSAL_CORES:
+        pos = folded.find(_fold(core))
+        if pos > 0:
+            before = re.sub(r"\[\d+\]|[^\w]", "", answer[:pos])
+            if len(re.sub(r"\d", "", before)) >= min_letters:
+                return answer[:pos].rstrip(" \n,;:-")
+    return answer
+
+
 def sanitize_citations(answer: str, n_sources: int) -> tuple[str, int]:
     """Drop citations that point outside [1..n_sources] (the model copying article numbers like "[85]").
     Returns the cleaned answer and how many citations were removed."""
@@ -178,6 +192,7 @@ class RAGPipeline:
                 language=LANGUAGE_NAMES[lang], answer=answer)}])
             gen_s += extra_s
             translated = True
+        answer = strip_trailing_refusal(answer)
         answer, bad_citations = sanitize_citations(answer, len(used))
         trace.update(to_llm=len(used), generation_s=gen_s, total_s=time.perf_counter() - start,
                      invalid_citations=bad_citations, translated=translated)

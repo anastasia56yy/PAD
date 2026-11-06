@@ -117,3 +117,12 @@ def test_expand_with_neighbors_merges_adjacent_chunks():
     assert passages[0].text == "Doc | Sec\npart 0\npart 1\npart 2\npart 3"
     assert passages[0].score == 0.3
     assert expand_with_neighbors([h(1, 0.3)], FakeStore(), 0)[0].chunk_id == "d1#1"   # window 0 = unchanged
+
+
+def test_strip_trailing_refusal_keeps_real_answers():
+    from src.pipeline import strip_trailing_refusal
+    mixed = "Rectorul UTM este VIOREL BOSTAN [1]. Nu am suficiente informații în sursele disponibile."
+    assert strip_trailing_refusal(mixed) == "Rectorul UTM este VIOREL BOSTAN [1]."
+    assert not is_refusal(strip_trailing_refusal(mixed))
+    assert strip_trailing_refusal(REFUSALS["ro"]) == REFUSALS["ro"]            # pure refusal stays
+    assert is_refusal(strip_trailing_refusal("[1] [2] " + REFUSALS["en"]))      # citations alone are not an answer
