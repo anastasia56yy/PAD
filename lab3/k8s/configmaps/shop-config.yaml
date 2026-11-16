@@ -1,0 +1,30 @@
+# Non-secret configuration, outside the images. Every service gets all keys (envFrom) and uses the ones it needs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shop-config
+  namespace: libraria
+  labels:
+    app.kubernetes.io/part-of: libraria
+data:
+  LOG_LEVEL: "INFO"
+  # service discovery through Kubernetes Services (DNS names), never localhost
+  AUTH_URL: "http://auth-service:8000"
+  USER_URL: "http://user-service:8000"
+  CATALOG_URL: "http://catalog-service:8000"
+  INVENTORY_URL: "http://inventory-service:8000"
+  CART_URL: "http://cart-service:8000"
+  ORDER_URL: "http://order-service:8000"
+  PAYMENT_URL: "http://payment-service:8000"
+  NOTIFICATION_URL: "http://notification-service:8000"
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  RABBITMQ_HOST: "rabbitmq"
+  # business settings
+  ADMIN_EMAILS: "admin@libraria.example"
+  JWT_TTL_SECONDS: "3600"
+  SEED_CATALOG: "true"
+  PAYMENT_PROVIDER_DELAY_SECONDS: "1.0"
+  RATE_LIMIT_AUTH_PER_MIN: "10"
+  RATE_LIMIT_CHECKOUT_PER_MIN: "10"
+  RATE_LIMIT_PER_MIN: "240"
