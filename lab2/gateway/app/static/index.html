@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Libraria</title>
+  <meta name="description" content="Книжный магазин Libraria — учебный проект: микросервисы, саги и события.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231d1d1f'/%3E%3Cpath d='M9 8h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H9zM23 8h-2a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h3z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"><span class="blob blob-1"></span><span class="blob blob-2"></span><span class="blob blob-3"></span></div>
+
+  <header class="topbar glass">
+    <a class="brand" href="/" aria-label="Libraria — на главную">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 5h5a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H4zM20 5h-5a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h6z"/></svg>
+      </span>
+      <span class="brand-name">Libraria</span>
+    </a>
+    <label class="search" aria-label="Поиск книг">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Название или автор" autocomplete="off">
+    </label>
+    <div class="topbar-right">
+      <button class="icon-btn" id="btn-admin" type="button" aria-label="Панель администратора" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-orders" type="button" aria-label="Мои заказы" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-bell" type="button" aria-label="Уведомления" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+        <span class="badge" id="bell-badge" hidden>0</span>
+      </button>
+      <button class="icon-btn" id="btn-cart" type="button" aria-label="Корзина">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h15l-1.5 9h-12zM6 7 5 3H2M9 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM18 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+        <span class="badge" id="cart-badge" hidden>0</span>
+      </button>
+      <button class="avatar" id="btn-avatar" type="button" aria-label="Аккаунт" hidden></button>
+      <button class="pill-btn" id="btn-signin" type="button">Войти</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="hero">
+      <p class="eyebrow">Libraria · микросервисный книжный магазин</p>
+      <h1 class="headline">Книги, которые остаются с&nbsp;вами.<span class="headline-muted"> Доставка по&nbsp;Молдове.</span></h1>
+    </section>
+    <nav class="genres" id="genres" aria-label="Жанры"></nav>
+    <div class="toolbar">
+      <p class="result-count" id="result-count" aria-live="polite"></p>
+      <label class="sort">Сортировка
+        <select id="sort">
+          <option value="title">по названию</option>
+          <option value="price">сначала дешевле</option>
+          <option value="-price">сначала дороже</option>
+          <option value="-year">сначала новые</option>
+        </select>
+      </label>
+    </div>
+    <section class="grid" id="grid" aria-label="Каталог"></section>
+    <p class="degraded" id="degraded" hidden>Склад временно недоступен: наличие не показывается, каталог работает.</p>
+  </main>
+
+  <p class="fineprint">Учебный проект. Оплата имитируется — реальные платёжные данные не вводятся и не списываются.</p>
+
+  <!-- side panel: cart, orders, notifications, admin -->
+  <aside class="panel glass" id="panel" aria-hidden="true" aria-labelledby="panel-title">
+    <div class="panel-head">
+      <h2 id="panel-title">Корзина</h2>
+      <button class="icon-btn" id="panel-close" type="button" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-foot" id="panel-foot"></div>
+  </aside>
+
+  <!-- book details -->
+  <dialog class="sheet glass" id="book-dialog" aria-labelledby="book-title">
+    <div class="book-sheet" id="book-sheet"></div>
+  </dialog>
+
+  <!-- checkout -->
+  <dialog class="sheet glass" id="checkout-dialog" aria-labelledby="checkout-title">
+    <form class="form" id="checkout-form" novalidate>
+      <h2 id="checkout-title" class="sheet-title">Оформление заказа</h2>
+      <p class="sheet-sub" id="checkout-summary"></p>
+      <div class="row">
+        <label class="field"><span>Получатель</span><input name="full_name" autocomplete="name" required minlength="2"></label>
+        <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" required placeholder="+373 69 000000"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Город</span><input name="city" autocomplete="address-level2" required minlength="2"></label>
+        <label class="field"><span>Улица, дом</span><input name="street" autocomplete="street-address" required minlength="3"></label>
+      </div>
+      <fieldset class="methods">
+        <legend>Способ оплаты <small>(имитация)</small></legend>
+        <label class="method"><input type="radio" name="payment_method" value="card_success" checked>
+          <span><b>Тестовая карта — успешно</b><small>Платёж пройдёт, заказ будет оплачен</small></span></label>
+        <label class="method"><input type="radio" name="payment_method" value="card_decline">
+          <span><b>Тестовая карта — отказ</b><small>Банк отклонит платёж, резерв вернётся на склад</small></span></label>
+        <label class="method"><input type="radio" name="payment_method" value="cash_on_delivery">
+          <span><b>Оплата при получении</b><small>Наличными курьеру</small></span></label>
+      </fieldset>
+      <p class="form-error" id="checkout-error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" class="ghost" data-close>Отмена</button>
+        <button type="submit" class="primary" id="checkout-submit">Подтвердить заказ</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- live order tracking (the saga, step by step) -->
+  <dialog class="sheet glass" id="track-dialog" aria-labelledby="track-title">
+    <div class="track">
+      <h2 class="sheet-title" id="track-title">Заказ</h2>
+      <p class="sheet-sub" id="track-sub"></p>
+      <ol class="steps" id="track-steps">
+        <li data-step="created"><span class="step-dot"></span><div><b>Заказ принят</b><small>order-service сохранил заказ</small></div></li>
+        <li data-step="stock"><span class="step-dot"></span><div><b>Резерв на складе</b><small>inventory-service</small></div></li>
+        <li data-step="payment"><span class="step-dot"></span><div><b>Оплата</b><small>payment-service</small></div></li>
+        <li data-step="done"><span class="step-dot"></span><div><b>Готовим к отправке</b><small>уведомление отправлено</small></div></li>
+      </ol>
+      <p class="track-result" id="track-result" aria-live="polite"></p>
+      <div class="actions"><button type="button" class="primary" data-close>Готово</button></div>
+    </div>
+  </dialog>
+
+  <!-- sign in / sign up -->
+  <dialog class="sheet glass" id="auth-dialog" aria-labelledby="auth-title">
+    <form class="form" id="auth-form" novalidate>
+      <div class="segmented" role="tablist">
+        <button type="button" role="tab" class="seg is-active" data-mode="login" aria-selected="true">Вход</button>
+        <button type="button" role="tab" class="seg" data-mode="register" aria-selected="false">Регистрация</button>
+      </div>
+      <h2 id="auth-title" class="sheet-title">С возвращением</h2>
+      <label class="field only-register"><span>Имя и фамилия</span><input name="full_name" autocomplete="name" minlength="2"></label>
+      <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label>
+      <label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <p class="form-error" id="auth-error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" class="ghost" data-close>Отмена</button>
+        <button type="submit" class="primary" id="auth-submit">Войти</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
