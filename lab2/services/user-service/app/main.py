@@ -1,4 +1,4 @@
-"""user-service: student profiles (name, faculty, preferred answer language).
+"""user-service: customer profiles with the default delivery address.
 
 Owns: user_db.
 Consumes: user.registered (creates the profile — registration in auth-service does not call us directly).
@@ -28,14 +28,16 @@ class Profile(Base):
     user_id: Mapped[int] = mapped_column(primary_key=True)  # same id as in auth-service
     email: Mapped[str] = mapped_column(String(254))
     full_name: Mapped[str] = mapped_column(String(120))
-    faculty: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    language: Mapped[str] = mapped_column(String(2), default="ro")
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    street: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 engine = make_engine()
 Session = make_session_factory(engine)
-app = create_app("user-service", {"database": lambda: ping(engine)}, description="Student profiles.")
+app = create_app("user-service", {"database": lambda: ping(engine)},
+                 description="Customer profiles and default delivery address.")
 
 
 def on_user_registered(event: dict) -> None:
@@ -43,8 +45,7 @@ def on_user_registered(event: dict) -> None:
     with Session() as s:
         if s.get(Profile, p["user_id"]):  # at-least-once delivery: the event may arrive twice
             return
-        s.add(Profile(user_id=p["user_id"], email=p["email"], full_name=p["full_name"],
-                      faculty=p.get("faculty"), language=p.get("language", "ro")))
+        s.add(Profile(user_id=p["user_id"], email=p["email"], full_name=p["full_name"]))
         s.commit()
     log_event(log, "Profile created", user_id=p["user_id"])
 
@@ -53,21 +54,23 @@ def on_user_registered(event: dict) -> None:
 def startup() -> None:
     init_schema(engine)
     if env("EVENTS_ENABLED", "true") == "true":
-        events.start_consumer("user-service.user-registered", ["user.registered"], on_user_registered)
+        events.start_consumer("user-service.users", on_user_registered)
 
 
 class ProfileOut(BaseModel):
     user_id: int
     email: str
     full_name: str
-    faculty: str | None
-    language: str
+    phone: str | None
+    city: str | None
+    street: str | None
 
 
 class ProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
-    faculty: str | None = Field(default=None, max_length=20)
-    language: str | None = Field(default=None, pattern="^(ro|en|ru)$")
+    phone: str | None = Field(default=None, pattern=r"^\+?[0-9 ()-]{6,20}$")
+    city: str | None = Field(default=None, min_length=2, max_length=80)
+    street: str | None = Field(default=None, min_length=3, max_length=200)
 
 
 def _get(user_id: int) -> Profile:
@@ -84,7 +87,7 @@ def my_profile(identity: Identity = Depends(current_identity)) -> ProfileOut:
     return ProfileOut.model_validate(_get(identity.user_id), from_attributes=True)
 
 
-@app.patch("/users/me", response_model=ProfileOut, tags=["users"])
+@app.patch("/users/me", response_model=ProfileOut, tags=["users"], summary="Update name, phone or address")
 def update_profile(body: ProfileUpdate, identity: Identity = Depends(current_identity)) -> ProfileOut:
     with Session() as s:
         profile = s.get(Profile, identity.user_id)
