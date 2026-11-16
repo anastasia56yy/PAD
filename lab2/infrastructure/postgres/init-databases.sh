@@ -14,5 +14,9 @@ SQL
 
 create_db auth_db         auth_svc         "$AUTH_DB_PASSWORD"
 create_db user_db         user_svc         "$USER_DB_PASSWORD"
-create_db history_db      history_svc      "$HISTORY_DB_PASSWORD"
+create_db catalog_db      catalog_svc      "$CATALOG_DB_PASSWORD"
+create_db inventory_db    inventory_svc    "$INVENTORY_DB_PASSWORD"
+create_db cart_db         cart_svc         "$CART_DB_PASSWORD"
+create_db order_db        order_svc        "$ORDER_DB_PASSWORD"
+create_db payment_db      payment_svc      "$PAYMENT_DB_PASSWORD"
 create_db notification_db notification_svc "$NOTIFICATION_DB_PASSWORD"

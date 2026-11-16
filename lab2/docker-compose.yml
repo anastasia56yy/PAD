@@ -1,36 +1,27 @@
-# Whole system with one command:  docker compose --env-file .env up --build
+# Libraria bookstore: the whole system with one command
+#   docker compose --env-file .env up -d --build
 # Secrets come from .env (copy .env.example, never commit .env).
 
-x-service-env: &service-env
-  LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-  JWT_SECRET: ${JWT_SECRET}
-
-x-healthcheck: &healthcheck
-  # slim images have no curl: use Python itself
-  test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
-  interval: 10s
-  timeout: 5s
-  retries: 5
-  start_period: 20s
-
-x-light: &light
+x-service: &service
   build:
     context: ..
     dockerfile: lab2/docker/Dockerfile.service
   restart: unless-stopped
-  healthcheck: *healthcheck
-
-x-rag: &rag
-  build:
-    context: ..
-    dockerfile: lab2/docker/Dockerfile.rag
-  restart: unless-stopped
   healthcheck:
-    <<: *healthcheck
-    start_period: 90s
-  extra_hosts:
-    - "host.docker.internal:host-gateway"   # Ollama runs on the host (uses the GPU there)
+    # slim images have no curl: use Python itself
+    test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+  depends_on:
+    postgres: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+
+x-env: &env
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+  JWT_SECRET: ${JWT_SECRET}
 
 services:
   # ---------------- infrastructure ----------------
@@ -41,7 +32,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
       USER_DB_PASSWORD: ${USER_DB_PASSWORD}
-      HISTORY_DB_PASSWORD: ${HISTORY_DB_PASSWORD}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -58,104 +53,103 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "15672:15672"   # management UI: watch queues and events during the demo
+      - "15672:15672"   # management UI: watch the queues of the checkout saga during the demo
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # "ping" only says the node is up; check that AMQP connections are really accepted
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       retries: 10
     restart: unless-stopped
 
   # ---------------- business services ----------------
   auth-service:
-    <<: *light
+    <<: *service
     build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/auth-service}}
     environment:
-      <<: *service-env
+      <<: *env
       SERVICE_NAME: auth-service
       DATABASE_URL: postgresql+psycopg://auth_svc:${AUTH_DB_PASSWORD}@postgres:5432/auth_db
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       JWT_TTL_SECONDS: "3600"
-    depends_on: {postgres: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
 
   user-service:
-    <<: *light
+    <<: *service
     build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/user-service}}
     environment:
-      <<: *service-env
+      <<: *env
       SERVICE_NAME: user-service
       DATABASE_URL: postgresql+psycopg://user_svc:${USER_DB_PASSWORD}@postgres:5432/user_db
-    depends_on: {postgres: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
 
-  history-service:
-    <<: *light
-    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/history-service}}
+  catalog-service:
+    <<: *service
+    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/catalog-service}}
     environment:
-      <<: *service-env
-      SERVICE_NAME: history-service
-      DATABASE_URL: postgresql+psycopg://history_svc:${HISTORY_DB_PASSWORD}@postgres:5432/history_db
-    depends_on: {postgres: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
+      <<: *env
+      SERVICE_NAME: catalog-service
+      DATABASE_URL: postgresql+psycopg://catalog_svc:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db
+      SEED_CATALOG: "true"
+
+  inventory-service:
+    <<: *service
+    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/inventory-service}}
+    environment:
+      <<: *env
+      SERVICE_NAME: inventory-service
+      DATABASE_URL: postgresql+psycopg://inventory_svc:${INVENTORY_DB_PASSWORD}@postgres:5432/inventory_db
+
+  cart-service:
+    <<: *service
+    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/cart-service}}
+    environment:
+      <<: *env
+      SERVICE_NAME: cart-service
+      DATABASE_URL: postgresql+psycopg://cart_svc:${CART_DB_PASSWORD}@postgres:5432/cart_db
+      CATALOG_URL: http://catalog-service:8000
+
+  order-service:
+    <<: *service
+    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/order-service}}
+    environment:
+      <<: *env
+      SERVICE_NAME: order-service
+      DATABASE_URL: postgresql+psycopg://order_svc:${ORDER_DB_PASSWORD}@postgres:5432/order_db
+      CART_URL: http://cart-service:8000
+
+  payment-service:
+    <<: *service
+    build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/payment-service}}
+    environment:
+      <<: *env
+      SERVICE_NAME: payment-service
+      DATABASE_URL: postgresql+psycopg://payment_svc:${PAYMENT_DB_PASSWORD}@postgres:5432/payment_db
+      PAYMENT_PROVIDER_DELAY_SECONDS: "1.0"
 
   notification-service:
-    <<: *light
+    <<: *service
     build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/services/notification-service}}
     environment:
-      <<: *service-env
+      <<: *env
       SERVICE_NAME: notification-service
       DATABASE_URL: postgresql+psycopg://notification_svc:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification_db
-    depends_on: {postgres: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
-
-  search-service:
-    <<: *rag
-    build: {context: .., dockerfile: lab2/docker/Dockerfile.rag, args: {SERVICE_DIR: lab2/services/search-service}}
-    environment:
-      <<: *service-env
-      SERVICE_NAME: search-service
-      RAG_DATA_DIR: /data
-      INGESTION_URL: http://ingestion-service:8000
-    volumes:
-      - ./data/search:/data          # owns the vector index
-      - model-cache:/models
-    depends_on: {rabbitmq: {condition: service_healthy}}
-
-  answer-service:
-    <<: *rag
-    build: {context: .., dockerfile: lab2/docker/Dockerfile.rag, args: {SERVICE_DIR: lab2/services/answer-service}}
-    environment:
-      <<: *service-env
-      SERVICE_NAME: answer-service
-      SEARCH_URL: http://search-service:8000
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
-    depends_on: {rabbitmq: {condition: service_healthy}, search-service: {condition: service_started}}
-
-  ingestion-service:
-    <<: *rag
-    build: {context: .., dockerfile: lab2/docker/Dockerfile.rag, args: {SERVICE_DIR: lab2/services/ingestion-service}}
-    environment:
-      <<: *service-env
-      SERVICE_NAME: ingestion-service
-      RAG_DATA_DIR: /data
-    volumes:
-      - ./data/ingestion:/data       # owns the grabber manifest and documents
-      - model-cache:/models
-    depends_on: {rabbitmq: {condition: service_healthy}}
 
   # ---------------- entry point ----------------
   gateway:
-    <<: *light
+    <<: *service
     build: {context: .., dockerfile: lab2/docker/Dockerfile.service, args: {SERVICE_DIR: lab2/gateway}}
     environment:
-      <<: *service-env
+      <<: *env
       SERVICE_NAME: api-gateway
     ports:
-      - "8080:8000"
+      - "8080:8000"   # the only public HTTP port
     depends_on:
       auth-service: {condition: service_healthy}
       user-service: {condition: service_healthy}
-      history-service: {condition: service_healthy}
+      catalog-service: {condition: service_healthy}
+      inventory-service: {condition: service_healthy}
+      cart-service: {condition: service_healthy}
+      order-service: {condition: service_healthy}
+      payment-service: {condition: service_healthy}
       notification-service: {condition: service_healthy}
-      answer-service: {condition: service_started}
 
 volumes:
   postgres-data:
-  model-cache:
