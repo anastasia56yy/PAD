@@ -13,7 +13,7 @@ import os
 import time
 
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from .config import env, env_int
 
@@ -68,9 +68,15 @@ def current_identity(x_user_id: str | None = Header(default=None), x_user_role: 
     """FastAPI dependency for services behind the gateway."""
     if not x_user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
-    return Identity(int(x_user_id), x_user_role or "student")
+    return Identity(int(x_user_id), x_user_role or "customer")
 
 
 def require_admin(identity: Identity) -> None:
     if identity.role != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
+
+
+def admin_identity(identity: Identity = Depends(current_identity)) -> Identity:
+    """FastAPI dependency: the caller must be an admin."""
+    require_admin(identity)
+    return identity
