@@ -1,10 +1,14 @@
-﻿"""notification-service: in-app notifications for students.
+﻿"""notification-service: in-app notifications for customers.
 
 Owns: notification_db.
 Consumes:
-  user.registered    -> welcome notification
-  question.answered  -> when the base had no answer, suggest how to rephrase
-  documents.updated  -> broadcast "the document base was updated" (user_id = NULL means everyone)
+  user.registered  -> welcome notification
+  order.created    -> "order received, checking stock"
+  order.paid       -> "order paid" / "order confirmed, pay on delivery"
+  order.cancelled  -> "order cancelled" with the reason (out of stock, card declined, by customer)
+  order.shipped    -> "order shipped"
+  order.delivered  -> "order delivered"
+A notification with user_id = NULL is shown to everybody (kept for shop-wide announcements).
 """
 from __future__ import annotations
 
@@ -38,7 +42,7 @@ class Notification(Base):
 
 
 class ReadMark(Base):
-    """Read state per user: a broadcast notification read by one student stays unread for the others."""
+    """Read state per user: a broadcast notification read by one customer stays unread for the others."""
     __tablename__ = "read_marks"
     notification_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -49,23 +53,35 @@ Session = make_session_factory(engine)
 app = create_app("notification-service", {"database": lambda: ping(engine)}, description="In-app notifications.")
 
 
+def money(cents: int | None) -> str:
+    return f"{(cents or 0) / 100:,.2f} MDL".replace(",", " ")
+
+
 def build_notification(event: dict) -> Notification | None:
     p, kind = event["payload"], event["type"]
+
+    def note(kind_: str, title: str, body: str) -> Notification:
+        return Notification(event_id=event["id"], user_id=p.get("user_id"), kind=kind_, title=title, body=body)
+
     if kind == "user.registered":
-        return Notification(event_id=event["id"], user_id=p["user_id"], kind="welcome",
-                            title="Добро пожаловать в UTM Assistant",
-                            body="Задавайте вопросы о регламентах, ECTS, стипендиях и факультете — "
-                                 "ответы приходят из официальных документов со ссылками на источники.")
-    if kind == "question.answered" and p.get("refused") and p.get("user_id"):
-        return Notification(event_id=event["id"], user_id=p["user_id"], kind="no_answer",
-                            title="На вопрос не нашлось ответа",
-                            body=f"«{p['question'][:120]}» — в документах UTM нет ответа. "
-                                 "Попробуйте сформулировать конкретнее или спросить о другом аспекте.")
-    if kind == "documents.updated":
-        return Notification(event_id=event["id"], user_id=None, kind="documents_updated",
-                            title="База документов обновлена",
-                            body=f"Новых документов: {p.get('new', 0)}, изменённых: {p.get('updated', 0)}, "
-                                 f"удалённых: {p.get('deleted', 0)}. Всего в базе: {p.get('documents', '—')}.")
+        return note("welcome", "Добро пожаловать в Libraria",
+                    "Выбирайте книги в каталоге, добавляйте в корзину и следите за заказами здесь.")
+    oid = p.get("order_id")
+    if kind == "order.created":
+        return note("order_created", f"Заказ №{oid} принят",
+                    f"Сумма {money(p.get('total_cents'))}. Проверяем наличие на складе.")
+    if kind == "order.paid":
+        if p.get("status") == "confirmed":
+            return note("order_confirmed", f"Заказ №{oid} подтверждён",
+                        f"Оплата при получении: {money(p.get('total_cents'))}. Готовим к отправке.")
+        return note("order_paid", f"Заказ №{oid} оплачен",
+                    f"Платёж {money(p.get('total_cents'))} прошёл. Готовим к отправке.")
+    if kind == "order.cancelled":
+        return note("order_cancelled", f"Заказ №{oid} отменён", p.get("reason_text") or "Заказ отменён.")
+    if kind == "order.shipped":
+        return note("order_shipped", f"Заказ №{oid} отправлен", "Курьер свяжется с вами перед доставкой.")
+    if kind == "order.delivered":
+        return note("order_delivered", f"Заказ №{oid} доставлен", "Спасибо за покупку! Приятного чтения.")
     return None
 
 
@@ -85,8 +101,7 @@ def on_event(event: dict) -> None:
 def startup() -> None:
     init_schema(engine)
     if env("EVENTS_ENABLED", "true") == "true":
-        events.start_consumer("notification-service.all",
-                              ["user.registered", "question.answered", "documents.updated"], on_event)
+        events.start_consumer("notification-service.all", on_event)
 
 
 class NotificationOut(BaseModel):
