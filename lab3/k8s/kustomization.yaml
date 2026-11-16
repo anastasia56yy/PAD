@@ -1,0 +1,27 @@
+# kubectl apply -k lab3/k8s   — everything except the Secret, which is created from lab3/.env (see scripts/deploy.ps1)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespace.yaml
+  - configmaps/shop-config.yaml
+  - infrastructure/postgres.yaml
+  - infrastructure/rabbitmq.yaml
+  - services/auth-service/deployment.yaml
+  - services/auth-service/service.yaml
+  - services/user-service/deployment.yaml
+  - services/user-service/service.yaml
+  - services/catalog-service/deployment.yaml
+  - services/catalog-service/service.yaml
+  - services/inventory-service/deployment.yaml
+  - services/inventory-service/service.yaml
+  - services/cart-service/deployment.yaml
+  - services/cart-service/service.yaml
+  - services/order-service/deployment.yaml
+  - services/order-service/service.yaml
+  - services/payment-service/deployment.yaml
+  - services/payment-service/service.yaml
+  - services/notification-service/deployment.yaml
+  - services/notification-service/service.yaml
+  - services/gateway/deployment.yaml
+  - services/gateway/service.yaml
+  - autoscaling/gateway-hpa.yaml

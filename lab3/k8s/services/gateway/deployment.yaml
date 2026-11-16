@@ -1,0 +1,65 @@
+# gateway: API gateway and storefront
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: libraria
+  labels:
+    app: gateway
+    app.kubernetes.io/part-of: libraria
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}   # a new pod must be ready before an old one stops
+  selector:
+    matchLabels: {app: gateway}
+  template:
+    metadata:
+      labels:
+        app: gateway
+        app.kubernetes.io/part-of: libraria
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: gateway
+          image: libraria/gateway:1.0
+          imagePullPolicy: IfNotPresent    # images are built inside Minikube (scripts/build-images.ps1)
+          ports:
+            - {name: http, containerPort: 8000}
+          envFrom:
+            - configMapRef: {name: shop-config}
+          env:
+            - {name: SERVICE_NAME, value: gateway}
+            - {name: RABBITMQ_USER, valueFrom: {secretKeyRef: {name: shop-secrets, key: RABBITMQ_USER}}}
+            - {name: RABBITMQ_PASSWORD, valueFrom: {secretKeyRef: {name: shop-secrets, key: RABBITMQ_PASSWORD}}}
+            - {name: RABBITMQ_URL, value: "amqp://$(RABBITMQ_USER):$(RABBITMQ_PASSWORD)@$(RABBITMQ_HOST):5672/"}
+            - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: shop-secrets, key: JWT_SECRET}}}
+          startupProbe:          # up to 120 s to start (database and broker may still be starting) before liveness
+            httpGet: {path: /health, port: http}
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:         # process alive? restart the container if not
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:        # dependencies reachable? only then the Service sends traffic here
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests: {cpu: "100m", memory: "96Mi"}   # measured at idle: 70-110m CPU, 41-68Mi
+            limits: {cpu: "500m", memory: "256Mi"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}   # the only writable path (root filesystem is read-only)
+      volumes:
+        - {name: tmp, emptyDir: {}}
