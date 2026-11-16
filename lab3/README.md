@@ -175,7 +175,13 @@ order-service-...-rx2bx   1/1  Running
 ```
 
 Три реплики order-service разбирают одну очередь саги RabbitMQ как конкурирующие потребители.
-Для gateway настроен **HorizontalPodAutoscaler** (2–5 реплик при загрузке CPU > 70 %, metrics-server).
+Для gateway настроен **HorizontalPodAutoscaler** (2–5 реплик при загрузке CPU > 70 %, нужен addon metrics-server):
+
+```text
+$ kubectl -n libraria get hpa
+NAME      REFERENCE            TARGETS       MINPODS   MAXPODS   REPLICAS
+gateway   Deployment/gateway   cpu: 2%/70%   2         5         2
+```
 
 **Самовосстановление**:
 
