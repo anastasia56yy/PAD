@@ -123,7 +123,9 @@ def on_saga_event(event: dict) -> None:
         new_status = "confirmed" if p.get("method") == "cash_on_delivery" else "paid"
         transition(oid, ("awaiting_payment",), new_status, details={"payment_id": p.get("payment_id")},
                    emit=lambda o: [("order.paid", {"order_id": o.id, "user_id": o.user_id, "status": new_status,
-                                                   "total_cents": o.total_cents})])
+                                                   "total_cents": o.total_cents,
+                                                   "items": [{"book_id": i.book_id, "quantity": i.quantity}
+                                                             for i in o.items]})])
     elif kind == "payment.failed":
         # compensation: order.cancelled makes inventory release the reserved copies
         transition(oid, ("awaiting_payment",), "cancelled", emit=cancelled("payment_declined"),

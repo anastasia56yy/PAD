@@ -110,7 +110,7 @@ BOOKS = {1: {"id": 1, "title": "1984", "author": "Orwell", "cover_color": "#000"
          2: {"id": 2, "title": "Dune", "author": "Herbert", "cover_color": "#111", "price_cents": 25900}}
 
 
-def test_cart_totals_and_cleanup_after_order(monkeypatch, published):
+def test_cart_totals_and_cleanup_after_payment(monkeypatch, published):
     svc = load_service("services/cart-service")
     monkeypatch.setattr(svc, "fetch_books", lambda ids: {i: BOOKS[i] for i in ids if i in BOOKS})
     client = TestClient(svc.app)
@@ -121,7 +121,7 @@ def test_cart_totals_and_cleanup_after_order(monkeypatch, published):
     assert client.put("/cart/items/1", json={"quantity": 50}, headers=auth_headers(1)).status_code == 422
     assert client.get("/cart", headers=auth_headers(2)).json()["items"] == []  # carts are per user
 
-    svc.on_order_created(event("order.created", {"order_id": 1, "user_id": 1, "items": [{"book_id": 1, "quantity": 2}]}))
+    svc.on_order_paid(event("order.paid", {"order_id": 1, "user_id": 1, "items": [{"book_id": 1, "quantity": 2}]}))
     assert [i["book_id"] for i in client.get("/cart", headers=auth_headers(1)).json()["items"]] == [2]
 
 

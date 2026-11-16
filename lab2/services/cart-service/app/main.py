@@ -3,7 +3,8 @@
 Owns: cart_db (only book ids and quantities: titles and prices are always taken fresh from the catalog,
 so a changed price is never shown from a stale copy).
 Calls: catalog-service (REST) to show titles, prices and to validate added books.
-Consumes: order.created -> empties the buyer's cart (the order now holds the items).
+Consumes: order.paid -> removes the bought books from the cart. Not order.created: if the card is declined or a
+          book is out of stock the order is cancelled, and the buyer should still find the books in the cart.
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ Session = make_session_factory(engine)
 app = create_app("cart-service", {"database": lambda: ping(engine)}, description="Shopping carts.")
 
 
-def on_order_created(event: dict) -> None:
+def on_order_paid(event: dict) -> None:
     p = event["payload"]
     ordered = [i["book_id"] for i in p["items"]]
     with Session() as s:
@@ -52,7 +53,7 @@ def on_order_created(event: dict) -> None:
 def startup() -> None:
     init_schema(engine)
     if env("EVENTS_ENABLED", "true") == "true":
-        events.start_consumer("cart-service.orders", on_order_created)
+        events.start_consumer("cart-service.orders", on_order_paid)
 
 
 def fetch_books(ids: list[int]) -> dict[int, dict]:

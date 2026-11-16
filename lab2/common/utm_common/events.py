@@ -30,7 +30,7 @@ TOPOLOGY: dict[str, list[str]] = {
     "user-service.users": ["user.registered"],
     "inventory-service.catalog": ["book.created"],
     "inventory-service.orders": ["order.created", "order.paid", "order.cancelled"],
-    "cart-service.orders": ["order.created"],
+    "cart-service.orders": ["order.paid"],
     "order-service.saga": ["inventory.reserved", "inventory.rejected", "payment.succeeded", "payment.failed"],
     "payment-service.requests": ["payment.requested"],
     "notification-service.all": ["user.registered", "order.created", "order.paid", "order.cancelled",
