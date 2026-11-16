@@ -1,0 +1,8 @@
+# Build context is the repository root: send only what the auth-service image needs
+**
+!lab2/common/requirements.txt
+!lab2/common/utm_common/**
+!lab2/services/auth-service/app/**
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

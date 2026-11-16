@@ -1,0 +1,8 @@
+# Build context is the repository root: send only what the order-service image needs
+**
+!lab2/common/requirements.txt
+!lab2/common/utm_common/**
+!lab2/services/order-service/app/**
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

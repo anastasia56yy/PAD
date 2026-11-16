@@ -1,0 +1,8 @@
+# Build context is the repository root: send only what the inventory-service image needs
+**
+!lab2/common/requirements.txt
+!lab2/common/utm_common/**
+!lab2/services/inventory-service/app/**
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
