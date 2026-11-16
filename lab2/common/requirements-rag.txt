@@ -1,9 +1,0 @@
-# lab1 RAG code dependencies, only for search / answer / ingestion (torch is installed CPU-only in the Dockerfile)
-requests>=2.32
-beautifulsoup4>=4.12
-lxml>=5.2
-pypdf>=4.3
-pyyaml>=6.0
-numpy>=1.26
-sentence-transformers>=3.0
-chromadb>=0.5
