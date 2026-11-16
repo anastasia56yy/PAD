@@ -52,8 +52,10 @@ def relay_once(session_factory) -> int:
     """Send pending events in creation order; stop at the first failure (order is preserved). Returns sent count."""
     sent = 0
     with session_factory() as s:
+        # FOR UPDATE SKIP LOCKED: with several replicas of a service, each pending row is taken by one relay only
+        # (PostgreSQL; SQLite in tests ignores the clause)
         rows = s.scalars(select(OutboxEvent).where(OutboxEvent.sent_at.is_(None))
-                         .order_by(OutboxEvent.id).limit(100)).all()
+                         .order_by(OutboxEvent.id).limit(100).with_for_update(skip_locked=True)).all()
         for row in rows:
             events.send_raw(row.event_type, row.body)  # raises when the broker is unavailable
             row.sent_at = datetime.now(timezone.utc)

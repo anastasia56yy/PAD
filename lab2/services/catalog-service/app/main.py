@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func, or_, select
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func, or_, select, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from utm_common import outbox
@@ -51,6 +51,9 @@ app = create_app("catalog-service", {"database": lambda: ping(engine)},
 def seed_catalog() -> None:
     """Fill an empty catalog once; inventory gets the starting stock through book.created events."""
     with Session() as s:
+        if s.bind.dialect.name == "postgresql":
+            # several replicas start at once (Kubernetes): only one of them may seed the empty catalog
+            s.execute(text("SELECT pg_advisory_xact_lock(424242)"))
         if s.scalar(select(func.count()).select_from(Book)):
             return
         for i, (title, author, genre, year, lang, pages, price, stock, desc) in enumerate(BOOKS):
