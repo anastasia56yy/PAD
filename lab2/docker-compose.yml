@@ -140,7 +140,7 @@ services:
       <<: *env
       SERVICE_NAME: api-gateway
     ports:
-      - "8080:8000"   # the only public HTTP port
+      - "8088:8000"   # the only public HTTP port (8080 is often taken by other dev servers, e.g. Flutter)
     depends_on:
       auth-service: {condition: service_healthy}
       user-service: {condition: service_healthy}
