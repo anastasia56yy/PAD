@@ -1,0 +1,104 @@
+# Lab 3: the Libraria images (lab3/docker/<service>/Dockerfile) started together before Kubernetes.
+#   cd lab3 && docker compose --env-file .env up -d --build      -> http://localhost:8090
+# Separate project name and port from lab2, so both labs can be shown independently.
+name: libraria-lab3
+
+x-service: &service
+  restart: unless-stopped
+  env_file: [config.env]          # non-secret settings (same keys as the Kubernetes ConfigMap)
+  depends_on:
+    postgres: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+  deploy:
+    resources:
+      limits: {cpus: "0.5", memory: 256M}
+
+x-secrets: &secrets
+  RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+  JWT_SECRET: ${JWT_SECRET}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../lab2/infrastructure/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10}
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    healthcheck: {test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"], interval: 10s, retries: 10}
+    restart: unless-stopped
+
+  auth-service:
+    <<: *service
+    image: libraria/auth-service:1.0
+    build: {context: .., dockerfile: lab3/docker/auth-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://auth_svc:${AUTH_DB_PASSWORD}@postgres:5432/auth_db"}
+
+  user-service:
+    <<: *service
+    image: libraria/user-service:1.0
+    build: {context: .., dockerfile: lab3/docker/user-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://user_svc:${USER_DB_PASSWORD}@postgres:5432/user_db"}
+
+  catalog-service:
+    <<: *service
+    image: libraria/catalog-service:1.0
+    build: {context: .., dockerfile: lab3/docker/catalog-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://catalog_svc:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db"}
+
+  inventory-service:
+    <<: *service
+    image: libraria/inventory-service:1.0
+    build: {context: .., dockerfile: lab3/docker/inventory-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://inventory_svc:${INVENTORY_DB_PASSWORD}@postgres:5432/inventory_db"}
+
+  cart-service:
+    <<: *service
+    image: libraria/cart-service:1.0
+    build: {context: .., dockerfile: lab3/docker/cart-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://cart_svc:${CART_DB_PASSWORD}@postgres:5432/cart_db"}
+
+  order-service:
+    <<: *service
+    image: libraria/order-service:1.0
+    build: {context: .., dockerfile: lab3/docker/order-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://order_svc:${ORDER_DB_PASSWORD}@postgres:5432/order_db"}
+
+  payment-service:
+    <<: *service
+    image: libraria/payment-service:1.0
+    build: {context: .., dockerfile: lab3/docker/payment-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://payment_svc:${PAYMENT_DB_PASSWORD}@postgres:5432/payment_db"}
+
+  notification-service:
+    <<: *service
+    image: libraria/notification-service:1.0
+    build: {context: .., dockerfile: lab3/docker/notification-service/Dockerfile}
+    environment: {<<: *secrets, DATABASE_URL: "postgresql+psycopg://notification_svc:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification_db"}
+
+  gateway:
+    <<: *service
+    image: libraria/gateway:1.0
+    build: {context: .., dockerfile: lab3/docker/gateway/Dockerfile}
+    environment: *secrets
+    ports: ["8090:8000"]
+
+volumes:
+  pgdata:

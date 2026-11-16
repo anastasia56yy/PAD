@@ -19,3 +19,6 @@ lab1/experiments/*.log
 # lab2: secrets and runtime data
 lab2/.env
 lab2/data/
+
+# lab3: real secrets (Kubernetes Secret and compose are generated from it)
+lab3/.env
