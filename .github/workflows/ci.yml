@@ -1,8 +1,13 @@
-# CI for the PAD labs: runs on every push and pull request to main.
+# CI/CD for the PAD labs.
+# CI (every push and pull request to main):
 #   1. lab2 tests       - 22 unit tests of the Libraria services (SQLite in memory, no Docker needed)
 #   2. lab3 images      - builds the Docker image of each of the 9 services
 #   3. lab3 manifests   - renders lab3/k8s with kustomize and validates every object against the Kubernetes schema
-name: CI
+# CD (push to main, only when all CI checks pass):
+#   4. publish          - pushes the 9 images to GitHub Container Registry (ghcr.io), tagged with the commit SHA
+#   5. deploy           - creates a temporary Kubernetes cluster (kind), deploys lab3/k8s with the published images
+#                         and runs lab3/scripts/smoke_test.py: register, buy a book, order paid, stock decreased
+name: CI/CD
 
 on:
   push:
@@ -80,3 +85,100 @@ jobs:
         run: |
           if git ls-files | grep -E '(^|/)\.env$'; then echo "a .env file is committed"; exit 1; fi
           echo "no .env files committed"
+
+  # ---------------- CD: only after every CI check is green, only for main ----------------
+
+  publish-images:
+    name: CD · publish ${{ matrix.service }}
+    needs: [lab2-tests, lab3-images, lab3-manifests]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - catalog-service
+          - inventory-service
+          - cart-service
+          - order-service
+          - payment-service
+          - notification-service
+          - gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push to GitHub Container Registry
+        run: |
+          image=ghcr.io/${{ github.repository_owner }}/libraria-${{ matrix.service }}
+          docker build -f lab3/docker/${{ matrix.service }}/Dockerfile \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t $image:${{ github.sha }} -t $image:latest .
+          docker push $image:${{ github.sha }}
+          docker push $image:latest
+          echo "published $image:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-kind:
+    name: CD · deploy to Kubernetes (kind) + smoke test
+    needs: publish-images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      SERVICES: auth-service user-service catalog-service inventory-service cart-service order-service payment-service notification-service gateway
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a temporary Kubernetes cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: libraria
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the published images into the cluster
+        run: |
+          for s in $SERVICES; do
+            docker pull ghcr.io/${{ github.repository_owner }}/libraria-$s:${{ github.sha }}
+            docker tag  ghcr.io/${{ github.repository_owner }}/libraria-$s:${{ github.sha }} libraria/$s:1.0
+            kind load docker-image libraria/$s:1.0 --name libraria
+          done
+      - name: Namespace and Secret (random passwords, generated only for this run)
+        run: |
+          kubectl apply -f lab3/k8s/00-namespace.yaml
+          args=()
+          for key in $(grep -oE '^\s*(\w*(PASSWORD|SECRET)\w*|RABBITMQ_USER)' lab3/.env.example); do
+            if [ "$key" = RABBITMQ_USER ]; then args+=("--from-literal=$key=shop");
+            else args+=("--from-literal=$key=$(openssl rand -hex 24)"); fi
+          done
+          kubectl -n libraria create secret generic shop-secrets "${args[@]}"
+          echo "secret keys: ${#args[@]}"
+      - name: Deploy (kubectl apply -k lab3/k8s)
+        run: kubectl apply -k lab3/k8s
+      - name: Wait for the rollout
+        run: |
+          kubectl -n libraria rollout status statefulset/postgres --timeout=300s
+          kubectl -n libraria rollout status statefulset/rabbitmq --timeout=300s
+          for d in $(kubectl -n libraria get deploy -o name); do kubectl -n libraria rollout status $d --timeout=300s; done
+          kubectl -n libraria get pods,svc -o wide
+      - name: Smoke test through the gateway
+        run: |
+          kubectl -n libraria port-forward svc/gateway 8090:8000 > /tmp/port-forward.log 2>&1 &
+          sleep 5
+          python3 lab3/scripts/smoke_test.py http://localhost:8090
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n libraria get pods -o wide || true
+          kubectl -n libraria get events --sort-by=.lastTimestamp | tail -40 || true
+          for p in $(kubectl -n libraria get pods -o name); do echo "----- $p"; kubectl -n libraria logs $p --tail=40 || true; done
