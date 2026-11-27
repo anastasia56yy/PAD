@@ -208,6 +208,33 @@ $ kubectl -n libraria logs -l app.kubernetes.io/part-of=libraria --prefix | grep
 [pod/notification-service-...-bf8m4]  Notification created ×2
 ```
 
+### CI/CD в GitHub Actions
+
+Файл `.github/workflows/ci.yml`, результаты во вкладке **Actions** репозитория.
+
+| Этап | Когда | Что делает |
+| --- | --- | --- |
+| **CI** · lab2 tests | каждый push и pull request | 22 теста сервисов магазина |
+| **CI** · lab3 image ×9 | каждый push и pull request | сборка образа каждого сервиса, проверка запуска не от root |
+| **CI** · Kubernetes manifests | каждый push и pull request | `kubectl kustomize lab3/k8s` + проверка по схеме Kubernetes (kubeconform, 27 объектов), проверка, что `.env` не попал в Git |
+| **CD** · publish ×9 | push в `main`, только если весь CI зелёный | публикация образов в GitHub Container Registry: `ghcr.io/anastasia56yy/libraria-<сервис>:<commit SHA>` и `:latest` |
+| **CD** · deploy | после публикации | временный кластер Kubernetes (kind), образы из ghcr.io, Secret со случайными паролями, `kubectl apply -k lab3/k8s`, ожидание rollout и сквозной тест `scripts/smoke_test.py` |
+
+Сквозной тест (`python lab3/scripts/smoke_test.py http://localhost:8090`) работает и против Minikube: все
+сервисы ready → запрос без токена 401 → регистрация и вход → корзина → заказ картой → заказ `paid`, остаток
+книги −1, уведомление пришло. Результат в CD:
+
+```text
+ok: 8 services ready: auth, user, catalog, inventory, cart, order, payment, notification
+ok: order #1 is paid
+ok: stock of '1984': 22 -> 21
+SMOKE TEST PASSED
+```
+
+Развернуть автоматически в локальный Minikube из GitHub нельзя: кластер находится на ноутбуке и недоступен
+из интернета. Поэтому CD проверяет развёртывание во временном кластере kind, а опубликованные образы можно
+развернуть на любом кластере.
+
 ## 9. Что пришлось изменить в коде ЛР2 для нескольких реплик
 
 В ЛР2 каждый сервис работал в одном экземпляре. В Kubernetes с двумя репликами обнаружились две проблемы:

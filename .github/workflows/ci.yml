@@ -122,8 +122,14 @@ jobs:
           docker build -f lab3/docker/${{ matrix.service }}/Dockerfile \
             --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
             -t $image:${{ github.sha }} -t $image:latest .
-          docker push $image:${{ github.sha }}
-          docker push $image:latest
+          # the registry sometimes answers "denied" while it is still creating a new package: retry a few times
+          for tag in ${{ github.sha }} latest; do
+            for attempt in 1 2 3 4 5; do
+              docker push $image:$tag && break
+              [ $attempt = 5 ] && exit 1
+              echo "push failed, retry $attempt in 15 s"; sleep 15
+            done
+          done
           echo "published $image:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 
   deploy-kind:
