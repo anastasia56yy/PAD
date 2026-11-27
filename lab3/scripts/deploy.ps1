@@ -6,9 +6,11 @@ $envFile = Join-Path $lab3 ".env"
 if (-not (Test-Path $envFile)) { throw "Create lab3/.env from lab3/.env.example first (real secrets, never committed)" }
 
 kubectl apply -f "$lab3/k8s/00-namespace.yaml"
-# the Secret is generated from .env every time, so no secret value is ever stored in Git
-kubectl -n libraria create secret generic shop-secrets --from-env-file="$envFile" --dry-run=client -o yaml |
-    kubectl apply -f -
+# the Secret is generated from .env every time, so no secret value is ever stored in Git.
+# Only secret keys go into it (passwords, JWT key, broker login); plain settings live in the ConfigMap.
+$secretArgs = Get-Content $envFile | Where-Object { $_ -match '^\s*(\w*(PASSWORD|SECRET)\w*|RABBITMQ_USER)\s*=' } |
+    ForEach-Object { "--from-literal=$($_.Trim())" }
+kubectl -n libraria create secret generic shop-secrets @secretArgs --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -k "$lab3/k8s"
 
 Write-Host "Waiting for the pods..." -ForegroundColor Cyan
